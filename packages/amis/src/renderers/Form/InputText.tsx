@@ -29,6 +29,8 @@ import {supportStatic} from './StaticHoc';
 
 import type {Option} from 'amis-core';
 import type {ListenerAction} from 'amis-core';
+import {HotKeyEvent} from 'amis-core/src/domain';
+import {HotKeyConfig} from 'amis-core/src/renderers/Item';
 
 // declare function matchSorter(items:Array<any>, input:any, options:any): Array<any>;
 
@@ -165,10 +167,20 @@ export default class TextControl extends React.PureComponent<
   TextProps,
   TextState
 > {
+  static defaultProps: Partial<TextProps> = {
+    resetValue: '',
+    labelField: 'label',
+    valueField: 'value',
+    placeholder: '',
+    allowInputText: true,
+    trimContents: true,
+    nativeAutoComplete: 'off'
+  };
   input?: HTMLInputElement;
 
   highlightedIndex?: any;
   unHook: Function;
+
   constructor(props: TextProps) {
     super(props);
 
@@ -263,6 +275,12 @@ export default class TextControl extends React.PureComponent<
     this.input = ref;
   }
 
+  handleESC(e: HotKeyEvent) {
+    // alert('kzl');
+    e.eat = false;
+  }
+
+  @autobind
   doAction(
     action: ListenerAction,
     data: any,
@@ -397,6 +415,7 @@ export default class TextControl extends React.PureComponent<
 
   async handleFocus(e: any) {
     const {dispatchEvent, onFocus, value} = this.props;
+    onFocus?.(e);
     this.setState({
       isOpen: true,
       isFocused: true
@@ -412,12 +431,11 @@ export default class TextControl extends React.PureComponent<
     if (rendererEvent?.prevented) {
       return;
     }
-
-    onFocus?.(e);
   }
 
   async handleBlur(e: any) {
     const {onBlur, trimContents, value, onChange, dispatchEvent} = this.props;
+    onBlur?.(e);
 
     this.setState(
       {
@@ -446,8 +464,6 @@ export default class TextControl extends React.PureComponent<
     if (rendererEvent?.prevented) {
       return;
     }
-
-    onBlur && onBlur(e);
   }
 
   @autobind
@@ -1325,7 +1341,14 @@ export function mapItemIndex(
 }
 
 @OptionsControl({
-  type: 'input-text'
+  type: 'input-text',
+  hotkeyActions: [
+    {
+      key: 'esc',
+      action: 'handleESC',
+      scope: '文本框'
+    }
+  ]
 })
 export class TextControlRenderer extends TextControl {}
 

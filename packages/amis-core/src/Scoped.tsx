@@ -23,6 +23,7 @@ import {RendererData, ActionObject} from './types';
 import {isPureVariable} from './utils/isPureVariable';
 import {createObject, createRendererEvent, filter, memoParse} from './utils';
 import {ListenerAction, runActions} from './actions';
+import {HotKeyEvent} from './domain';
 
 /**
  * target 里面可能包含 ?xxx=xxx，这种情况下，需要把 ?xxx=xxx 保留下来，然后对前面的部分进行 filter
@@ -82,6 +83,7 @@ export function splitTarget(target: string): Array<string> {
 
 export interface ScopedComponentType extends React.Component<RendererProps> {
   focus?: () => void;
+  handleHotkey?: (e: HotKeyEvent) => void;
   doAction?: (
     action: ActionObject,
     data: RendererData,
@@ -125,6 +127,7 @@ export interface IScopedContext {
   ) => ScopedComponentType[];
   doAction: (actions: ListenerAction | ListenerAction[], ctx: any) => void;
 }
+
 type AliasIScopedContext = IScopedContext;
 
 const rootScopedContext = createScopedTools('');
@@ -520,6 +523,7 @@ export function HocScoped<
   type ScopedProps = T & {
     scopeRef?: (ref: any) => void;
   };
+
   class ScopedComponent extends React.Component<ScopedProps> {
     static displayName = `Scoped(${
       ComposedComponent.displayName || ComposedComponent.name

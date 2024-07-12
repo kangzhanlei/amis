@@ -25,12 +25,13 @@ import type {RenderOptions, RendererConfig, RendererProps} from './factory';
 import './polyfills';
 import './renderers/builtin';
 import './renderers/register';
+
 export * from './utils/index';
 export * from './types';
 export * from './store';
 import * as utils from './utils/helper';
 import {getEnv} from 'mobx-state-tree';
-
+import {domain, HotKeyEvent} from './domain';
 import {RegisterStore, RendererStore} from './store';
 import type {IColumn, IColumn2, IRow, IRow2} from './store';
 import {
@@ -57,6 +58,7 @@ import {
   makeClassnames
 } from './theme';
 import type {ClassNamesFn, ThemeProps} from './theme';
+
 const classPrefix = getClassPrefix();
 
 export * from './actions';
@@ -323,6 +325,10 @@ function AMISRenderer({
     return schema;
   }, [schema, locale]);
 
+  function processHotKey(event: HotKeyEvent) {
+    // alert('我是热键的老祖宗');
+  }
+
   return (
     <EnvContext.Provider value={env}>
       <ScopedRootRenderer
@@ -330,6 +336,8 @@ function AMISRenderer({
         schema={schema}
         pathPrefix={pathPrefix}
         rootStore={store}
+        domain={domain}
+        onHotkey={processHotKey}
         env={env}
         theme={theme}
         locale={locale}

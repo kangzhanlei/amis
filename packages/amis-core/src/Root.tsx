@@ -5,19 +5,22 @@ import {RendererProps} from './factory';
 import {LocaleContext, TranslateFn} from './locale';
 import {RootRenderer} from './RootRenderer';
 import {SchemaRenderer} from './SchemaRenderer';
-import Scoped from './Scoped';
-import {IRendererStore} from './store';
-import {ThemeContext} from './theme';
+import Scoped, {IScopedContext, ScopedContext} from './Scoped';
+import {FormItemStore, IRendererStore, IFormItemStore} from './store';
+import {theme, ThemeContext} from './theme';
 import {Schema, SchemaNode} from './types';
 import {autobind, isEmpty} from './utils/helper';
 import {RootStoreContext} from './WithRootStore';
 import {StatusScoped, StatusScopedProps} from './StatusScoped';
+import {domain, HotkeyBinding, HotKeyEvent} from './domain';
 
 export interface RootRenderProps {
   location?: Location;
   theme?: string;
   data?: Record<string, any>;
   locale?: string;
+  hotkeyBindings?: HotkeyBinding[];
+
   [propName: string]: any;
 }
 
@@ -29,6 +32,7 @@ export interface RootProps extends StatusScopedProps {
   pathPrefix?: string;
   locale?: string;
   translate?: TranslateFn;
+
   [propName: string]: any;
 }
 
@@ -40,6 +44,7 @@ export interface RootWrapperProps {
   theme: string;
   data?: Record<string, any>;
   context?: Record<string, any>;
+
   [propName: string]: any;
 }
 
@@ -52,6 +57,38 @@ export function addRootWrapper(
 }
 
 export class Root extends React.Component<RootProps> {
+  static contextType = ScopedContext;
+
+  /**
+   * 返回true表示这个event被吃掉了，不继续default了
+   */
+  keyPressed(event: HotKeyEvent): boolean {
+    const {hotkeyBindings, rootStore, domain} = this.props;
+    const focusStore = Object.values(rootStore.stores).filter(store => {
+      return (
+        store.storeType === FormItemStore.name &&
+        (store as IFormItemStore).isFocused
+      );
+    });
+    const scoped = this.context as IScopedContext;
+    if (focusStore.length > 0) {
+      //表示当前焦点在form表单上，找到这个表单，问问他处理这个热键不？
+      //处理机制是，自己先处理，没处理的话问问父亲处理不处理，父亲不处理问问爷爷处理不处理，直到root结束
+      let componentId = (focusStore[0] as IFormItemStore).itemId;
+      const component = scoped.getComponentByIdUnderCurrentScope(componentId);
+      component?.handleHotkey?.call(component, event);
+    }
+    return event.eat;
+  }
+
+  componentDidMount() {
+    domain.installHotKey(this.keyPressed.bind(this));
+  }
+
+  componentWillUnmount() {
+    domain.unInstallHotKey();
+  }
+
   @autobind
   resolveDefinitions(name: string) {
     const definitions = (this.props.schema as Schema).definitions;
@@ -152,6 +189,7 @@ export interface renderChildProps
     StatusScopedProps {
   env: RendererEnv;
 }
+
 export type ReactElement = React.ReactNode[] | JSX.Element | null | false;
 
 const StatusScopedSchemaRenderer = StatusScoped(SchemaRenderer);

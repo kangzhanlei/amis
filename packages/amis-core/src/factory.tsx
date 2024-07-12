@@ -29,6 +29,8 @@ import type {RendererEnv} from './env';
 import {OnEventProps, RendererEvent} from './utils/renderer-event';
 import {Placeholder} from './renderers/Placeholder';
 import {StatusScopedProps} from './StatusScoped';
+import {Domain, HotKeyEvent} from './domain';
+import {HotKeyConfig} from './renderers/Item';
 
 export interface TestFunc {
   (
@@ -57,6 +59,7 @@ export interface RendererBasicConfig {
   isolateScope?: boolean;
   isFormItem?: boolean;
   autoVar?: boolean; // 自动解析变量
+  hotkeyActions?: HotKeyConfig[];
   // [propName:string]:any;
 }
 
@@ -91,6 +94,8 @@ export interface RendererProps
     renderer?: React.Component<RendererProps>
   ) => Promise<RendererEvent<any>>;
   mobileUI?: boolean;
+  domain: Domain;
+
   [propName: string]: any;
 }
 
@@ -196,6 +201,39 @@ export function registerRenderer(config: RendererConfig): RendererConfig {
 
   if (config.isolateScope) {
     config.component = Scoped(config.component, config.type);
+  }
+  if (config.hotkeyActions) {
+    //给对象注入一些快捷键的预置动作
+    let Component = config.component?.ComposedComponent;
+    if (Component) {
+      Component.prototype['__HOTKEY__'] = {};
+      //给@装饰器配置的{热键：函数}绑定一下
+      config.hotkeyActions.forEach(({key, action, scope}) => {
+        let registry = Component.prototype['__HOTKEY__'];
+        let fn = Component.prototype[action];
+        registry[key] = function (e: HotKeyEvent) {
+          fn.call(this, e);
+        };
+        registry[key].scope = scope;
+        console.log(`[${scope}]注册热键处理[${key}]==>${action}`);
+      });
+      //注册handleHotkey方法，实现ScopedComponentType里的handleHotkey接口
+      if (!Component.prototype['handleHotkey']) {
+        Component.prototype.handleHotkey = function (e: HotKeyEvent) {
+          let registry = this['__HOTKEY__'];
+          if (registry) {
+            registry && registry[e.key] && registry[e.key].call(this, e);
+            if (!e.eat) {
+              const {onHotkey: parentOnHotkey} = this.props;
+              parentOnHotkey?.(e);
+            }
+          } else {
+            const {onHotkey: parentOnHotkey} = this.props;
+            parentOnHotkey?.(e);
+          }
+        };
+      }
+    }
   }
 
   const idx = findIndex(
@@ -429,6 +467,7 @@ export function extendDefaultEnv(env: Partial<RenderOptions>) {
 }
 
 let cache: {[propName: string]: RendererConfig} = {};
+
 export function resolveRenderer(
   path: string,
   schema?: Schema

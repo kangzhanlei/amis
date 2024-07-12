@@ -29,7 +29,8 @@ import {
   isObjectShallowModified,
   qsparse,
   repeatCount,
-  createObject
+  createObject,
+  autobind
 } from '../utils/helper';
 
 import debouce from 'lodash/debounce';
@@ -53,6 +54,7 @@ import {injectObjectChain} from '../utils';
 import {reaction} from 'mobx';
 import groupBy from 'lodash/groupBy';
 import isEqual from 'lodash/isEqual';
+import {HotKeyEvent} from '../domain';
 
 export interface FormHorizontal {
   left?: number;
@@ -355,6 +357,7 @@ export type FormGroup = FormSchemaBase & {
   className?: string;
 };
 export type FormGroupNode = FormGroup | FormGroupArray;
+
 export interface FormGroupArray extends Array<FormGroupNode> {}
 
 export interface FormProps
@@ -395,6 +398,7 @@ export interface FormProps
     show?: boolean;
   };
 }
+
 export default class Form extends React.Component<FormProps, object> {
   static defaultProps = {
     title: 'Form.title',
@@ -475,6 +479,11 @@ export default class Form extends React.Component<FormProps, object> {
     leading: false
   });
   unBlockRouting?: () => void;
+  // 如果开启了 lazyChange，需要一个 flush 方法把队列中值应用上。
+  flushing = false;
+  emittedData: any = null;
+  emitting = false;
+
   constructor(props: FormProps) {
     super(props);
 
@@ -983,8 +992,6 @@ export default class Form extends React.Component<FormProps, object> {
     );
   }
 
-  // 如果开启了 lazyChange，需要一个 flush 方法把队列中值应用上。
-  flushing = false;
   async flush() {
     try {
       if (this.flushing) {
@@ -1061,13 +1068,12 @@ export default class Form extends React.Component<FormProps, object> {
       store.setLocalPersistData(persistDataKeys);
     }
   }
+
   formItemDispatchEvent(type: string, data: any) {
     const {dispatchEvent} = this.props;
     return dispatchEvent(type, data);
   }
 
-  emittedData: any = null;
-  emitting = false;
   async emitChange(submit: boolean, emitedFromWatch: boolean = false) {
     try {
       this.emitting = true;
@@ -1913,6 +1919,7 @@ export default class Form extends React.Component<FormProps, object> {
         (control as Schema).disabled ||
         (form.loading ? true : undefined),
       btnDisabled: disabled || form.loading || form.validating,
+      onHotkey: this.handleHotkey.bind(this),
       onAction: this.handleAction,
       onQuery: this.handleQuery,
       onChange: this.handleChange,
@@ -2014,9 +2021,13 @@ export default class Form extends React.Component<FormProps, object> {
           }
         )}
 
-        {this.renderFormItems({
-          body
-        })}
+        {this.renderFormItems(
+          {
+            body
+          },
+          '',
+          {onHotkey: this.handleHotkey.bind(this)}
+        )}
 
         {padDom}
 
@@ -2128,6 +2139,7 @@ export default class Form extends React.Component<FormProps, object> {
   type: 'form',
   storeType: FormStore.name,
   isolateScope: true,
+  hotkeyActions: [{key: 'esc', action: 'handleF1', scope: '表单'}],
   storeExtendsData: (props: any) => props.inheritData,
   shouldSyncSuperStore: (store, props, prevProps) => {
     // 如果是 QuickEdit，让 store 同步 __super 数据。
@@ -2176,6 +2188,11 @@ export class FormRenderer extends Form {
     scoped.unRegisterComponent(this);
 
     super.componentWillUnmount();
+  }
+
+  handleF1(e: HotKeyEvent) {
+    // alert('我是form哦');
+    e.eat = true;
   }
 
   doAction(
