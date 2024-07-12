@@ -6,8 +6,8 @@ import {LocaleContext, TranslateFn} from './locale';
 import {RootRenderer} from './RootRenderer';
 import {SchemaRenderer} from './SchemaRenderer';
 import Scoped, {IScopedContext, ScopedContext} from './Scoped';
-import {FormItemStore, IRendererStore, IFormItemStore} from './store';
-import {theme, ThemeContext} from './theme';
+import {FormItemStore, IFormItemStore, IRendererStore} from './store';
+import {ThemeContext} from './theme';
 import {Schema, SchemaNode} from './types';
 import {autobind, isEmpty} from './utils/helper';
 import {RootStoreContext} from './WithRootStore';
@@ -76,6 +76,8 @@ export class Root extends React.Component<RootProps> {
       //处理机制是，自己先处理，没处理的话问问父亲处理不处理，父亲不处理问问爷爷处理不处理，直到root结束
       let componentId = (focusStore[0] as IFormItemStore).itemId;
       const component = scoped.getComponentByIdUnderCurrentScope(componentId);
+      event.focusComponent = component;
+      event.focusStore = focusStore[0] as IFormItemStore;
       component?.handleHotkey?.call(component, event);
     }
     return event.eat;

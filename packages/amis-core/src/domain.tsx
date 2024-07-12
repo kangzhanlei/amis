@@ -1,5 +1,6 @@
 import {action, observable} from 'mobx';
 import {RendererAction} from './actions';
+import {IFormItemStore} from './store';
 
 /**
  * 热键事件
@@ -8,6 +9,8 @@ export class HotKeyEvent {
   key: string;
   scope?: string;
   eat: boolean;
+  focusComponent?: React.Component;
+  focusStore?: IFormItemStore;
 }
 
 /**
@@ -55,3 +58,10 @@ export class Domain {
 }
 
 export const domain = new Domain();
+export const NavigateDomainAction = function (event: HotKeyEvent) {
+  if (!event.focusComponent) {
+    return;
+  }
+  let component = event.focusComponent;
+  let model = event.focusStore;
+};
