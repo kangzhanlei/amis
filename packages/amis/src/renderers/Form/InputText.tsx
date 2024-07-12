@@ -3,34 +3,31 @@ import Downshift, {StateChangeOptions} from 'downshift';
 import {matchSorter} from 'match-sorter';
 import debouce from 'lodash/debounce';
 import find from 'lodash/find';
+import type {ListenerAction, Option} from 'amis-core';
 import {
-  OptionsControl,
-  OptionsControlProps,
-  highlight,
-  resolveEventData,
-  CustomStyle,
-  PopOver,
-  Overlay,
-  formatInputThemeCss,
-  setThemeClassName,
   ActionObject,
-  filter,
   autobind,
   createObject,
-  setVariable,
-  ucFirst,
+  CustomStyle,
+  filter,
+  formatInputThemeCss,
+  getVariable,
+  highlight,
   isEffectiveApi,
-  getVariable
+  OptionsControl,
+  OptionsControlProps,
+  Overlay,
+  PopOver,
+  resolveEventData,
+  setThemeClassName,
+  setVariable,
+  ucFirst
 } from 'amis-core';
-import {Icon, SpinnerExtraProps, Input, Spinner, OverflowTpl} from 'amis-ui';
+import {Icon, Input, OverflowTpl, Spinner, SpinnerExtraProps} from 'amis-ui';
 import {ActionSchema} from '../Action';
 import {FormOptionsSchema, SchemaApi} from '../../Schema';
 import {supportStatic} from './StaticHoc';
-
-import type {Option} from 'amis-core';
-import type {ListenerAction} from 'amis-core';
 import {HotKeyEvent} from 'amis-core/src/domain';
-import {HotKeyConfig} from 'amis-core/src/renderers/Item';
 
 // declare function matchSorter(items:Array<any>, input:any, options:any): Array<any>;
 
@@ -167,15 +164,6 @@ export default class TextControl extends React.PureComponent<
   TextProps,
   TextState
 > {
-  static defaultProps: Partial<TextProps> = {
-    resetValue: '',
-    labelField: 'label',
-    valueField: 'value',
-    placeholder: '',
-    allowInputText: true,
-    trimContents: true,
-    nativeAutoComplete: 'off'
-  };
   input?: HTMLInputElement;
 
   highlightedIndex?: any;

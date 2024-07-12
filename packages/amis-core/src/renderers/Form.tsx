@@ -1,46 +1,43 @@
 import React from 'react';
-import extend from 'lodash/extend';
 import {Renderer, RendererProps} from '../factory';
 import {FormStore, IFormStore} from '../store/form';
 import {
-  Api,
-  SchemaNode,
-  Schema,
   ActionObject,
-  Payload,
-  ClassName,
+  Api,
   BaseApiObject,
+  ClassName,
+  Payload,
+  Schema,
+  SchemaClassName,
   SchemaExpression,
-  SchemaClassName
+  SchemaNode
 } from '../types';
-import {filter, evalExpression} from '../utils/tpl';
+import {evalExpression, filter} from '../utils/tpl';
 import getExprProperties from '../utils/filter-schema';
 import {
-  promisify,
-  difference,
-  until,
-  noop,
-  isObject,
-  isVisible,
   cloneObject,
-  SkipOperation,
+  createObject,
+  difference,
   isEmpty,
-  getVariable,
+  isObject,
   isObjectShallowModified,
+  isVisible,
+  noop,
+  promisify,
   qsparse,
   repeatCount,
-  createObject,
-  autobind
+  SkipOperation,
+  until
 } from '../utils/helper';
 
 import debouce from 'lodash/debounce';
 import flatten from 'lodash/flatten';
 import find from 'lodash/find';
 import {
-  ScopedContext,
+  filterTarget,
   IScopedContext,
   ScopedComponentType,
-  filterTarget
+  ScopedContext
 } from '../Scoped';
 
 import {IComboStore} from '../store/combo';
@@ -2192,7 +2189,7 @@ export class FormRenderer extends Form {
 
   handleF1(e: HotKeyEvent) {
     // alert('我是form哦');
-    e.eat = true;
+    e.eat = false;
   }
 
   doAction(

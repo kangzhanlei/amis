@@ -1,23 +1,23 @@
 import React from 'react';
-import {RendererStore, IRendererStore, IIRendererStore} from './store/index';
-import {getEnv, destroy} from 'mobx-state-tree';
+import {IIRendererStore, IRendererStore, RendererStore} from './store/index';
+import {destroy, getEnv} from 'mobx-state-tree';
 import {wrapFetcher} from './utils/api';
 import {normalizeLink} from './utils/normalizeLink';
 import {
   findIndex,
+  isMobile,
+  parseQuery,
   promisify,
   qsparse,
   string2regExp,
-  parseQuery,
-  isMobile,
   TestIdBuilder
 } from './utils/helper';
 import {
-  fetcherResult,
-  SchemaNode,
-  Schema,
   EventTrack,
-  PlainObject
+  fetcherResult,
+  PlainObject,
+  Schema,
+  SchemaNode
 } from './types';
 import {observer} from 'mobx-react';
 import Scoped from './Scoped';
@@ -202,12 +202,13 @@ export function registerRenderer(config: RendererConfig): RendererConfig {
   if (config.isolateScope) {
     config.component = Scoped(config.component, config.type);
   }
+  //处理热键功能
   if (config.hotkeyActions) {
-    //给对象注入一些快捷键的预置动作
+    //知道被@renderer等绑定的原始类型
     let Component = config.component?.ComposedComponent;
     if (Component) {
       Component.prototype['__HOTKEY__'] = {};
-      //给@装饰器配置的{热键：函数}绑定一下
+      //给@装饰器配置的{热键：函数}绑定一下，绑定热键和renderer里对应的函数
       config.hotkeyActions.forEach(({key, action, scope}) => {
         let registry = Component.prototype['__HOTKEY__'];
         let fn = Component.prototype[action];
@@ -222,12 +223,15 @@ export function registerRenderer(config: RendererConfig): RendererConfig {
         Component.prototype.handleHotkey = function (e: HotKeyEvent) {
           let registry = this['__HOTKEY__'];
           if (registry) {
+            //执行组件对应的热键方法，如果eat为true表示事件被这个组件吃掉了，不再冒泡，同时也终止传播
             registry && registry[e.key] && registry[e.key].call(this, e);
             if (!e.eat) {
+              //热键执行也是冒泡的，向上冒，直到最外层
               const {onHotkey: parentOnHotkey} = this.props;
               parentOnHotkey?.(e);
             }
           } else {
+            //组件本身没有处理，冒泡看上层处理不处理
             const {onHotkey: parentOnHotkey} = this.props;
             parentOnHotkey?.(e);
           }

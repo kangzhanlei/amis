@@ -6,16 +6,22 @@ import {RendererAction} from './actions';
  */
 export class HotKeyEvent {
   key: string;
-  scopes?: string[];
+  scope?: string;
   eat: boolean;
 }
 
+/**
+ * 热键的绑定
+ */
 export interface HotkeyBinding {
   key: string;
-  domain?: string;
+  scope?: string;
   action?: RendererAction;
 }
 
+/**
+ * 主要针对页面的一些设置
+ */
 export class Domain {
   /**
    * 当前激活的组件
@@ -23,10 +29,10 @@ export class Domain {
   @observable activeControl: string;
   listener: any;
 
-  @action.bound focus(activeControl: string) {
-    this.activeControl = activeControl;
-  }
-
+  /**
+   * 注册热键功能
+   * @param fn
+   */
   @action.bound installHotKey(fn: (event: HotKeyEvent) => boolean) {
     this.listener = function (domEvent: any) {
       let he = {
@@ -38,6 +44,9 @@ export class Domain {
     document.addEventListener('keydown', this.listener);
   }
 
+  /**
+   * 关闭热键功能
+   */
   @action.bound
   unInstallHotKey() {
     document.removeEventListener('keydown', this.listener);
