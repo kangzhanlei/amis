@@ -202,12 +202,31 @@ export function registerRenderer(config: RendererConfig): RendererConfig {
   if (config.isolateScope) {
     config.component = Scoped(config.component, config.type);
   }
-  //处理热键功能
-  if (config.hotkeyActions) {
-    //知道被@renderer等绑定的原始类型
-    let Component = config.component?.ComposedComponent;
-    if (Component) {
-      Component.prototype['__HOTKEY__'] = {};
+  //知道被@renderer等绑定的原始类型
+  let Component = config.component?.ComposedComponent;
+  if (Component) {
+    Component.prototype['__HOTKEY__'] = {};
+    //注册handleHotkey方法，实现ScopedComponentType里的handleHotkey接口
+    if (!Component.prototype['handleHotkey']) {
+      Component.prototype.handleHotkey = function (e: HotKeyEvent) {
+        let registry = this['__HOTKEY__'];
+        if (registry) {
+          //执行组件对应的热键方法，如果eat为true表示事件被这个组件吃掉了，不再冒泡，同时也终止传播
+          registry && registry[e.key] && registry[e.key].call(this, e);
+          if (!e.eat) {
+            //热键执行也是冒泡的，向上冒，直到最外层
+            const {onHotkey: parentOnHotkey} = this.props;
+            parentOnHotkey?.(e);
+          }
+        } else {
+          //组件本身没有处理，冒泡看上层处理不处理
+          const {onHotkey: parentOnHotkey} = this.props;
+          parentOnHotkey?.(e);
+        }
+      };
+    }
+    //处理热键功能
+    if (config.hotkeyActions) {
       //给@装饰器配置的{热键：函数}绑定一下，绑定热键和renderer里对应的函数
       config.hotkeyActions.forEach(({key, action, scope}) => {
         let registry = Component.prototype['__HOTKEY__'];
@@ -218,25 +237,6 @@ export function registerRenderer(config: RendererConfig): RendererConfig {
         registry[key].scope = scope;
         console.log(`[${scope}]注册热键处理[${key}]==>${action}`);
       });
-      //注册handleHotkey方法，实现ScopedComponentType里的handleHotkey接口
-      if (!Component.prototype['handleHotkey']) {
-        Component.prototype.handleHotkey = function (e: HotKeyEvent) {
-          let registry = this['__HOTKEY__'];
-          if (registry) {
-            //执行组件对应的热键方法，如果eat为true表示事件被这个组件吃掉了，不再冒泡，同时也终止传播
-            registry && registry[e.key] && registry[e.key].call(this, e);
-            if (!e.eat) {
-              //热键执行也是冒泡的，向上冒，直到最外层
-              const {onHotkey: parentOnHotkey} = this.props;
-              parentOnHotkey?.(e);
-            }
-          } else {
-            //组件本身没有处理，冒泡看上层处理不处理
-            const {onHotkey: parentOnHotkey} = this.props;
-            parentOnHotkey?.(e);
-          }
-        };
-      }
     }
   }
 

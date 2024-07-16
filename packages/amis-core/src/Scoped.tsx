@@ -82,8 +82,8 @@ export function splitTarget(target: string): Array<string> {
 }
 
 export interface ScopedComponentType extends React.Component<RendererProps> {
-  focus?: () => void;
   handleHotkey?: (e: HotKeyEvent) => void;
+  focus?: () => void;
   doAction?: (
     action: ActionObject,
     data: RendererData,

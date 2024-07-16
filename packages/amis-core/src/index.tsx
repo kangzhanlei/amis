@@ -328,7 +328,7 @@ function AMISRenderer({
   }, [schema, locale]);
 
   function processHotKey(event: HotKeyEvent) {
-    alert('我是热键的老祖宗');
+    //根组件，什么也不做。
   }
 
   return (

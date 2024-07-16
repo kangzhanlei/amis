@@ -6,13 +6,18 @@ import {LocaleContext, TranslateFn} from './locale';
 import {RootRenderer} from './RootRenderer';
 import {SchemaRenderer} from './SchemaRenderer';
 import Scoped, {IScopedContext, ScopedContext} from './Scoped';
-import {FormItemStore, IFormItemStore, IRendererStore} from './store';
+import {IRendererStore} from './store';
 import {ThemeContext} from './theme';
 import {Schema, SchemaNode} from './types';
 import {autobind, isEmpty} from './utils/helper';
 import {RootStoreContext} from './WithRootStore';
 import {StatusScoped, StatusScopedProps} from './StatusScoped';
-import {domain, HotkeyBinding, HotKeyEvent} from './domain';
+import {
+  domain,
+  HotkeyBinding,
+  HotKeyEvent,
+  NavigateDomainAction
+} from './domain';
 
 export interface RootRenderProps {
   location?: Location;
@@ -59,32 +64,9 @@ export function addRootWrapper(
 export class Root extends React.Component<RootProps> {
   static contextType = ScopedContext;
 
-  /**
-   * 返回true表示这个event被吃掉了，不继续default了
-   */
-  keyPressed(event: HotKeyEvent): boolean {
-    const {hotkeyBindings, rootStore, domain} = this.props;
-    const focusStore = Object.values(rootStore.stores).filter(store => {
-      return (
-        store.storeType === FormItemStore.name &&
-        (store as IFormItemStore).isFocused
-      );
-    });
-    const scoped = this.context as IScopedContext;
-    if (focusStore.length > 0) {
-      //表示当前焦点在form表单上，找到这个表单，问问他处理这个热键不？
-      //处理机制是，自己先处理，没处理的话问问父亲处理不处理，父亲不处理问问爷爷处理不处理，直到root结束
-      let componentId = (focusStore[0] as IFormItemStore).itemId;
-      const component = scoped.getComponentByIdUnderCurrentScope(componentId);
-      event.focusComponent = component;
-      event.focusStore = focusStore[0] as IFormItemStore;
-      component?.handleHotkey?.call(component, event);
-    }
-    return event.eat;
-  }
-
   componentDidMount() {
-    domain.installHotKey(this.keyPressed.bind(this));
+    const {rootStore} = this.props;
+    domain.installHotKey(rootStore, this.context as IScopedContext);
   }
 
   componentWillUnmount() {
@@ -98,6 +80,18 @@ export class Root extends React.Component<RootProps> {
       return {};
     }
     return definitions && definitions[name];
+  }
+
+  @autobind
+  handleHotKey(event: HotKeyEvent) {
+    const {onHotkey} = this.props;
+    if (event.key === 'Enter') {
+      NavigateDomainAction(true)(event);
+    } else if (event.key === 'ArrowUp') {
+      NavigateDomainAction(false)(event);
+    } else {
+      onHotkey?.(event);
+    }
   }
 
   render() {
@@ -169,6 +163,7 @@ export class Root extends React.Component<RootProps> {
                       location={location}
                       data={data}
                       context={context}
+                      onHotkey={this.handleHotKey}
                       env={env}
                       classnames={theme.classnames}
                       classPrefix={theme.classPrefix}
