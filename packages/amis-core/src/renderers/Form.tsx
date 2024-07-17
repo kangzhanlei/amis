@@ -51,7 +51,6 @@ import {injectObjectChain} from '../utils';
 import {reaction} from 'mobx';
 import groupBy from 'lodash/groupBy';
 import isEqual from 'lodash/isEqual';
-import {HotKeyEvent} from '../domain';
 
 export interface FormHorizontal {
   left?: number;
@@ -2136,7 +2135,7 @@ export default class Form extends React.Component<FormProps, object> {
   type: 'form',
   storeType: FormStore.name,
   isolateScope: true,
-  hotkeyActions: [{key: 'esc', action: 'handleF1', scope: '表单'}],
+  hotkeyActions: [{key: 'F4', action: 'handleSubmit', scope: '表单'}],
   storeExtendsData: (props: any) => props.inheritData,
   shouldSyncSuperStore: (store, props, prevProps) => {
     // 如果是 QuickEdit，让 store 同步 __super 数据。
@@ -2187,17 +2186,16 @@ export class FormRenderer extends Form {
     super.componentWillUnmount();
   }
 
-  handleF1(e: HotKeyEvent) {
-    // alert('我是form哦');
-    e.eat = false;
-  }
-
   doAction(
     action: ActionObject,
     data: object = this.props.store.data,
     throwErrors: boolean = false
   ) {
     return this.handleAction(undefined, action, data, throwErrors);
+  }
+
+  handleSubmit() {
+    console.log('提交表单。。。');
   }
 
   async handleAction(

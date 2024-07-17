@@ -59,7 +59,8 @@ export interface RendererBasicConfig {
   isolateScope?: boolean;
   isFormItem?: boolean;
   autoVar?: boolean; // 自动解析变量
-  hotkeyActions?: HotKeyConfig[];
+  hotkeyActions?: HotKeyConfig[]; //对哪些热键敏感，当热键发生的时候，触发什么动作。
+  ignoreHotkeys?: string[]; //要求别人忽略哪些热键，就是不要把这些键当热键处理（比如按钮上按回车时，冒泡到顶层，顶层给导航到下一个节点就不好了,应该触发按钮的点击才对）
   // [propName:string]:any;
 }
 
@@ -202,10 +203,11 @@ export function registerRenderer(config: RendererConfig): RendererConfig {
   if (config.isolateScope) {
     config.component = Scoped(config.component, config.type);
   }
-  //知道被@renderer等绑定的原始类型
+  //获取被@renderer等绑定的原始类型比如TextControl啥的
   let Component = config.component?.ComposedComponent;
   if (Component) {
     Component.prototype['__HOTKEY__'] = {};
+    Component.prototype['__IGNORE_HOTKEY__'] = [];
     //注册handleHotkey方法，实现ScopedComponentType里的handleHotkey接口
     if (!Component.prototype['handleHotkey']) {
       Component.prototype.handleHotkey = function (e: HotKeyEvent) {
@@ -235,8 +237,14 @@ export function registerRenderer(config: RendererConfig): RendererConfig {
           fn.call(this, e);
         };
         registry[key].scope = scope;
-        console.log(`[${scope}]注册热键处理[${key}]==>${action}`);
+        console.log(`[${config.type}]注册热键: [${key}]==>${action}`);
       });
+    }
+    //处理忽略的热键，就是冒泡到上层的时候，上层也不要处理这个事件，让他走默认的动作，比如按钮上按回车就是点击，不是导航
+    if (config.ignoreHotkeys) {
+      let ignores = Component.prototype['__IGNORE_HOTKEY__'];
+      ignores.push(...config.ignoreHotkeys);
+      console.log(`[${config.type}]忽略导航热键[${ignores}]`);
     }
   }
 

@@ -13,11 +13,13 @@ import {autobind, isEmpty} from './utils/helper';
 import {RootStoreContext} from './WithRootStore';
 import {StatusScoped, StatusScopedProps} from './StatusScoped';
 import {
+  Domain,
   domain,
   HotkeyBinding,
   HotKeyEvent,
   NavigateDomainAction
 } from './domain';
+import {findDOMNode} from 'react-dom';
 
 export interface RootRenderProps {
   location?: Location;
@@ -63,14 +65,20 @@ export function addRootWrapper(
 
 export class Root extends React.Component<RootProps> {
   static contextType = ScopedContext;
+  domain: Domain;
 
   componentDidMount() {
     const {rootStore} = this.props;
-    domain.installHotKey(rootStore, this.context as IScopedContext);
+    this.domain = new Domain(
+      findDOMNode(this),
+      rootStore,
+      this.context as IScopedContext
+    );
+    this.domain.installHotKey();
   }
 
   componentWillUnmount() {
-    domain.unInstallHotKey();
+    this.domain.unInstallHotKey();
   }
 
   @autobind

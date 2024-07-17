@@ -263,11 +263,6 @@ export default class TextControl extends React.PureComponent<
     this.input = ref;
   }
 
-  handleESC(e: HotKeyEvent) {
-    // alert('kzl');
-    e.eat = false;
-  }
-
   @autobind
   doAction(
     action: ListenerAction,
@@ -1069,6 +1064,7 @@ export default class TextControl extends React.PureComponent<
           type={this.state.revealPassword ? 'text' : type}
           onFocus={this.handleFocus}
           onBlur={this.handleBlur}
+          onKeyDown={this.handleKeyDown}
           max={max}
           min={min}
           maxLength={maxLength}
@@ -1329,14 +1325,7 @@ export function mapItemIndex(
 }
 
 @OptionsControl({
-  type: 'input-text',
-  hotkeyActions: [
-    {
-      key: 'esc',
-      action: 'handleESC',
-      scope: '文本框'
-    }
-  ]
+  type: 'input-text'
 })
 export class TextControlRenderer extends TextControl {}
 

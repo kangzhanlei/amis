@@ -1,14 +1,7 @@
-import {action, observable} from 'mobx';
+import {action} from 'mobx';
 import {RendererAction} from './actions';
-import {
-  FormItemStore,
-  IFormItemStore,
-  IIRendererStore,
-  IRendererStore
-} from './store';
-import {IRootStore} from './store/root';
+import {FormItemStore, IFormItemStore, IRendererStore} from './store';
 import {IScopedContext} from './Scoped';
-import {findDOMNode} from 'react-dom';
 
 /**
  * 热键事件
@@ -16,9 +9,9 @@ import {findDOMNode} from 'react-dom';
 export class HotKeyEvent {
   key: string;
   scope?: string;
-  eat: boolean;
-  focusComponent?: React.Component;
-  focusStore?: IFormItemStore;
+  eat: boolean = false;
+  focusComponent?: React.Component; //焦点的组件实例
+  focusStore?: IFormItemStore; //焦点的store
 }
 
 /**
@@ -34,50 +27,86 @@ export interface HotkeyBinding {
  * 主要针对页面的一些设置
  */
 export class Domain {
+  constructor(
+    targetElement: HTMLElement,
+    rootStore: IRendererStore,
+    scoped: IScopedContext
+  ) {
+    this.targetElement = targetElement;
+    this.rootStore = rootStore;
+    this.scoped = scoped;
+  }
+
   /**
    * 当前激活的组件
    */
-  @observable activeControl: string;
   listener: any;
 
-  keyPressed = (rootStore: IRootStore, scoped: IScopedContext) => {
+  //根store,用于查找数据
+  rootStore: IRendererStore;
+
+  //scoped，用于查找对象
+  scoped: IScopedContext;
+
+  //挂载到哪个元素下
+  targetElement: HTMLElement;
+
+  keyPressed = () => {
     return (event: HotKeyEvent): boolean => {
-      const focusStore = Object.values(rootStore.stores).filter(store => {
-        return (
-          store.storeType === FormItemStore.name &&
-          (store as IFormItemStore).isFocused
+      if (!this.scoped) {
+        return false;
+      }
+      if (this.rootStore) {
+        const focusStore = Object.values(this.rootStore.stores).filter(
+          store => {
+            return (
+              store.storeType === FormItemStore.name &&
+              (store as IFormItemStore).isFocused
+            );
+          }
         );
-      });
-      if (focusStore.length > 0) {
+        event.focusStore = focusStore[0] as IFormItemStore;
+      }
+      let componentId = null;
+      if (event.focusStore) {
         //表示当前焦点在form表单上，找到这个表单，问问他处理这个热键不？
         //处理机制是，自己先处理，没处理的话问问父亲处理不处理，父亲不处理问问爷爷处理不处理，直到root结束
-        let componentId = (focusStore[0] as IFormItemStore).itemId;
-        const component = scoped.getComponentByIdUnderCurrentScope(componentId);
-        event.focusComponent = component;
-        event.focusStore = focusStore[0] as IFormItemStore;
-        component?.handleHotkey?.call(component, event);
+        componentId = (event.focusStore as IFormItemStore).itemId;
+      } else {
+        let active = document.activeElement;
+        if (active) {
+          componentId = active.getAttribute('id');
+          if (!componentId) {
+            componentId = active.getAttribute('name');
+          }
+        }
       }
+      if (!componentId) {
+        return false;
+      }
+
+      const component =
+        this.scoped.getComponentByIdUnderCurrentScope(componentId);
+      event.focusComponent = component;
+      component?.handleHotkey?.call(component, event);
       return event.eat;
     };
   };
 
   /**
    * 注册热键功能
-   * @param fn
    */
-  @action.bound installHotKey(
-    rootStore: IRendererStore,
-    scoped: IScopedContext
-  ) {
-    const fn = this.keyPressed(rootStore, scoped);
+  @action.bound installHotKey() {
+    const fn = this.keyPressed();
     this.listener = function (domEvent: any) {
-      let he = {
-        key: domEvent.key
+      let hotkeyEvent = {
+        key: domEvent.key,
+        eat: false
       } as HotKeyEvent;
-      fn(he) && domEvent.preventDefault();
+      fn(hotkeyEvent) && domEvent.preventDefault();
     };
     //处理绑定热键
-    document.addEventListener('keydown', this.listener);
+    this.targetElement.addEventListener('keydown', this.listener);
   }
 
   /**
@@ -85,18 +114,12 @@ export class Domain {
    */
   @action.bound
   unInstallHotKey() {
-    document.removeEventListener('keydown', this.listener);
+    this.targetElement.removeEventListener('keydown', this.listener);
     this.listener = null;
   }
 }
 
 function focusable(element: Element | null) {
-  console.log(
-    '检查：' +
-      element?.getAttribute('name') +
-      ',tabIndex=' +
-      element['tabIndex']
-  );
   if (!element) {
     return false;
   }
@@ -191,7 +214,6 @@ function getPreviousFocusableElement(
   return null;
 }
 
-export const domain = new Domain();
 /**
  * 导航的动作，比如按回车的时候，焦点往下走，按上箭头的时候，焦点往上走。 这里forward表示向前走，否则就是向上走
  * @param forward
@@ -200,6 +222,8 @@ export const domain = new Domain();
 export const NavigateDomainAction = function (forward: boolean) {
   return (event: HotKeyEvent) => {
     let component = event.focusComponent;
+    if (component) {
+    }
     let model = event.focusStore;
     let target = forward
       ? getNextFocusableElement(document.activeElement)

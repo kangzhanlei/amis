@@ -112,7 +112,7 @@ import {StatusScoped} from './StatusScoped';
 export * from './utils/index';
 export * from './types';
 export * from './store';
-
+export * from './domain';
 const classPrefix = getClassPrefix();
 
 export * from './actions';
@@ -338,7 +338,6 @@ function AMISRenderer({
         schema={schema}
         pathPrefix={pathPrefix}
         rootStore={store}
-        domain={domain}
         onHotkey={processHotKey}
         env={env}
         theme={theme}

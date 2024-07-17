@@ -38,12 +38,38 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
         "description": "调整数量大小查看效果吧！"
       },
       {
+        "type": "input-text",
+        "label": "数量",
+        "id": "kzl",
+        "name": "number",
+        "value": 0,
+        "description": "调整数量大小查看效果吧！"
+      },
+        {
+        "type": "input-text",
+        "label": "数量",
+        "id": "kzl",
+        "name": "number",
+        "value": 0,
+        "description": "调整数量大小查看效果吧！"
+      },
+      {
         "type":"select",
         "name" : "select",
         "options":[
             {"label":"亢占雷","value":"1"},
             {"label":"张仲升","value":"2"}
         ]
+      },
+      {
+      "type": "button",
+      "name": "button",
+      "label" :"我就是测试一下子",
+      "actionType": "dialog",
+      "dialog": {
+          "title": "弹框",
+          "body": "这是个简单的弹框。"
+       }
       },
       {
         "type": "input-text",
