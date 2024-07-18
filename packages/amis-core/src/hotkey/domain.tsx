@@ -1,7 +1,7 @@
 import {action} from 'mobx';
-import {RendererAction} from './actions';
-import {FormItemStore, IFormItemStore, IRendererStore} from './store';
-import {IScopedContext} from './Scoped';
+import {RendererAction} from '../actions';
+import {FormItemStore, IFormItemStore, IRendererStore} from '../store';
+import {IScopedContext} from '../Scoped';
 import KeyStroke from './keyboard';
 
 /**

@@ -27,7 +27,7 @@ import {Icon, Input, OverflowTpl, Spinner, SpinnerExtraProps} from 'amis-ui';
 import {ActionSchema} from '../Action';
 import {FormOptionsSchema, SchemaApi} from '../../Schema';
 import {supportStatic} from './StaticHoc';
-import {HotKeyEvent} from 'amis-core/src/domain';
+import {HotKeyEvent} from '../../../../amis-core/src/hotkey/domain';
 
 // declare function matchSorter(items:Array<any>, input:any, options:any): Array<any>;
 

@@ -29,7 +29,7 @@ import type {RendererEnv} from './env';
 import {OnEventProps, RendererEvent} from './utils/renderer-event';
 import {Placeholder} from './renderers/Placeholder';
 import {StatusScopedProps} from './StatusScoped';
-import {Domain, HotKeyEvent} from './domain';
+import {Domain, HotKeyEvent} from './hotkey/domain';
 import {HotKeyConfig} from './renderers/Item';
 
 export interface TestFunc {

@@ -17,7 +17,7 @@ import {
   HotkeyBinding,
   HotKeyEvent,
   NavigateDomainAction
-} from './domain';
+} from './hotkey/domain';
 import {findDOMNode} from 'react-dom';
 
 export interface RootRenderProps {
@@ -90,7 +90,7 @@ export class Root extends React.Component<RootProps> {
   }
 
   @autobind
-  handleHotKey(event: HotKeyEvent) {
+  handleHotkey(event: HotKeyEvent) {
     const {onHotkey} = this.props;
     if (event.key === 'Enter'.toLowerCase()) {
       NavigateDomainAction(true)(event);
@@ -170,7 +170,7 @@ export class Root extends React.Component<RootProps> {
                       location={location}
                       data={data}
                       context={context}
-                      onHotkey={this.handleHotKey}
+                      onHotkey={this.handleHotkey}
                       env={env}
                       classnames={theme.classnames}
                       classPrefix={theme.classPrefix}

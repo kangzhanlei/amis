@@ -27,7 +27,7 @@ import './renderers/builtin';
 import './renderers/register';
 import * as utils from './utils/helper';
 import {getEnv} from 'mobx-state-tree';
-import {domain, HotKeyEvent} from './domain';
+import {domain, HotKeyEvent} from './hotkey/domain';
 import type {IColumn, IColumn2, IRow, IRow2} from './store';
 import {RegisterStore, RendererStore} from './store';
 import type {LocaleProps, TranslateFn} from './locale';
@@ -112,7 +112,7 @@ import {StatusScoped} from './StatusScoped';
 export * from './utils/index';
 export * from './types';
 export * from './store';
-export * from './domain';
+export * from './hotkey/domain';
 const classPrefix = getClassPrefix();
 
 export * from './actions';

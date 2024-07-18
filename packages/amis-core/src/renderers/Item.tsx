@@ -47,7 +47,7 @@ import PopOver from '../components/PopOver';
 import CustomStyle from '../components/CustomStyle';
 import classNames from 'classnames';
 import isPlainObject from 'lodash/isPlainObject';
-import {HotKeyEvent} from '../domain';
+import {HotKeyEvent} from '../hotkey/domain';
 
 export type LabelAlign = 'right' | 'left' | 'top' | 'inherit';
 

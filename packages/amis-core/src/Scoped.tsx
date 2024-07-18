@@ -23,7 +23,7 @@ import {RendererData, ActionObject} from './types';
 import {isPureVariable} from './utils/isPureVariable';
 import {createObject, createRendererEvent, filter, memoParse} from './utils';
 import {ListenerAction, runActions} from './actions';
-import {HotKeyEvent} from './domain';
+import {HotKeyEvent} from './hotkey/domain';
 
 /**
  * target 里面可能包含 ?xxx=xxx，这种情况下，需要把 ?xxx=xxx 保留下来，然后对前面的部分进行 filter
