@@ -2135,7 +2135,7 @@ export default class Form extends React.Component<FormProps, object> {
   type: 'form',
   storeType: FormStore.name,
   isolateScope: true,
-  hotkeyActions: [{key: 'F4', action: 'handleSubmit', scope: '表单'}],
+  // hotkeyActions: [{key: 'F4', action: 'handleSubmit', scope: '表单'}],
   storeExtendsData: (props: any) => props.inheritData,
   shouldSyncSuperStore: (store, props, prevProps) => {
     // 如果是 QuickEdit，让 store 同步 __super 数据。
@@ -2195,7 +2195,7 @@ export class FormRenderer extends Form {
   }
 
   handleSubmit() {
-    console.log('提交表单。。。');
+    // console.log('提交表单。。。');
   }
 
   async handleAction(

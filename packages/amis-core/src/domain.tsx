@@ -2,6 +2,7 @@ import {action} from 'mobx';
 import {RendererAction} from './actions';
 import {FormItemStore, IFormItemStore, IRendererStore} from './store';
 import {IScopedContext} from './Scoped';
+import KeyStroke from './keyboard';
 
 /**
  * 热键事件
@@ -27,6 +28,12 @@ export interface HotkeyBinding {
  * 主要针对页面的一些设置
  */
 export class Domain {
+  /**
+   * 构造domain实例
+   * @param targetElement 挂载到哪个html的元素上
+   * @param rootStore 对应的rootStore数据，用于查找数据
+   * @param scoped 对应的scoped范围，用于查找组件
+   */
   constructor(
     targetElement: HTMLElement,
     rootStore: IRendererStore,
@@ -57,22 +64,15 @@ export class Domain {
         return false;
       }
       if (this.rootStore) {
-        const focusStore = Object.values(this.rootStore.stores).filter(
-          store => {
-            return (
-              store.storeType === FormItemStore.name &&
-              (store as IFormItemStore).isFocused
-            );
-          }
+        const focusStore = Object.values(this.rootStore.stores).find(
+          store =>
+            store.storeType === FormItemStore.name &&
+            (store as IFormItemStore).isFocused
         );
-        event.focusStore = focusStore[0] as IFormItemStore;
+        event.focusStore = focusStore as IFormItemStore;
       }
-      let componentId = null;
-      if (event.focusStore) {
-        //表示当前焦点在form表单上，找到这个表单，问问他处理这个热键不？
-        //处理机制是，自己先处理，没处理的话问问父亲处理不处理，父亲不处理问问爷爷处理不处理，直到root结束
-        componentId = (event.focusStore as IFormItemStore).itemId;
-      } else {
+      let componentId = event.focusStore?.itemId;
+      if (!componentId) {
         let active = document.activeElement;
         if (active) {
           componentId = active.getAttribute('id');
@@ -98,15 +98,15 @@ export class Domain {
    */
   @action.bound installHotKey() {
     const fn = this.keyPressed();
-    this.listener = function (domEvent: any) {
+    this.listener = function (keyEvent: KeyboardEvent) {
       let hotkeyEvent = {
-        key: domEvent.key,
+        key: KeyStroke.getKeyStroke(keyEvent),
         eat: false
       } as HotKeyEvent;
-      fn(hotkeyEvent) && domEvent.preventDefault();
+      fn(hotkeyEvent) && keyEvent.preventDefault();
     };
     //处理绑定热键
-    this.targetElement.addEventListener('keydown', this.listener);
+    this.targetElement?.addEventListener('keydown', this.listener);
   }
 
   /**
@@ -114,7 +114,7 @@ export class Domain {
    */
   @action.bound
   unInstallHotKey() {
-    this.targetElement.removeEventListener('keydown', this.listener);
+    this.targetElement?.removeEventListener('keydown', this.listener);
     this.listener = null;
   }
 }

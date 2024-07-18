@@ -14,7 +14,6 @@ import {RootStoreContext} from './WithRootStore';
 import {StatusScoped, StatusScopedProps} from './StatusScoped';
 import {
   Domain,
-  domain,
   HotkeyBinding,
   HotKeyEvent,
   NavigateDomainAction
@@ -93,9 +92,9 @@ export class Root extends React.Component<RootProps> {
   @autobind
   handleHotKey(event: HotKeyEvent) {
     const {onHotkey} = this.props;
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter'.toLowerCase()) {
       NavigateDomainAction(true)(event);
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === 'ArrowUp'.toLowerCase()) {
       NavigateDomainAction(false)(event);
     } else {
       onHotkey?.(event);
