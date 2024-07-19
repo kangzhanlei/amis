@@ -8,18 +8,23 @@ import React from 'react';
 import Transition, {
   ENTERED,
   ENTERING,
-  EXITING,
-  EXITED
+  EXITED,
+  EXITING
 } from 'react-transition-group/Transition';
 import Portal from 'react-overlays/Portal';
-import {current, addModal, removeModal} from './ModalManager';
-import {ClassNamesFn, themeable, ThemeProps} from 'amis-core';
-import {Icon} from './icons';
-import {LocaleProps, localeable} from 'amis-core';
-import {autobind, getScrollbarWidth} from 'amis-core';
+import {addModal, current, removeModal} from './ModalManager';
 import {
-  DraggableCore,
+  autobind,
+  getScrollbarWidth,
+  localeable,
+  LocaleProps,
+  themeable,
+  ThemeProps
+} from 'amis-core';
+import {Icon} from './icons';
+import {
   type DraggableBounds,
+  DraggableCore,
   type DraggableData,
   type DraggableEvent
 } from 'react-draggable';
@@ -94,7 +99,6 @@ export class Modal extends React.Component<ModalProps, ModalState> {
 
   isRootClosed = false;
   modalDom: HTMLElement;
-
   static Header = themeable(
     localeable(
       ({
@@ -192,6 +196,7 @@ export class Modal extends React.Component<ModalProps, ModalState> {
   state: Readonly<ModalState> = {dragPos: undefined};
 
   componentDidMount() {
+    console.log(`这是一个测试哦${this.props.domain}`);
     if (this.props.show) {
       this.handleEnter();
       this.handleEntered();
@@ -261,9 +266,15 @@ export class Modal extends React.Component<ModalProps, ModalState> {
     const {classPrefix: ns} = this.props;
     if (ref) {
       addModal(this);
+      // @ts-ignore
+      const {onModalMounted} = this.props;
+      onModalMounted?.(this);
       (ref as HTMLElement).classList.add(`${ns}Modal--${current()}th`);
     } else {
       removeModal(this);
+      // @ts-ignore
+      const {onModalUnMounted} = this.props;
+      onModalUnMounted?.(this);
     }
   };
 

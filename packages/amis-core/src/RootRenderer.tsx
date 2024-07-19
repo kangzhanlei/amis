@@ -1,7 +1,7 @@
 import {observer} from 'mobx-react';
 import React from 'react';
 import type {RootProps} from './Root';
-import {IScopedContext, ScopedContext, filterTarget} from './Scoped';
+import {filterTarget, IScopedContext, ScopedContext} from './Scoped';
 import {IRootStore, RootStore} from './store/root';
 import {ActionObject} from './types';
 import {bulkBindFunctions, guid, isVisible} from './utils/helper';
@@ -12,6 +12,9 @@ import mapValues from 'lodash/mapValues';
 import {saveAs} from 'file-saver';
 import {normalizeApi} from './utils/api';
 import {findDOMNode} from 'react-dom';
+import {reaction} from 'mobx';
+import {IReactionDisposer} from 'mobx/lib/internal';
+import {Domain} from './hotkey/domain';
 
 export interface RootRendererProps extends RootProps {
   location?: any;
@@ -24,6 +27,7 @@ export interface RootRendererProps extends RootProps {
 export class RootRenderer extends React.Component<RootRendererProps> {
   store: IRootStore;
   static contextType = ScopedContext;
+  domainReaction: IReactionDisposer;
 
   constructor(props: RootRendererProps) {
     super(props);
@@ -53,7 +57,14 @@ export class RootRenderer extends React.Component<RootRendererProps> {
       'visibilitychange',
       this.handlePageVisibilityChange
     );
-
+    //当store的加载状态变化的时候，更新domain的busy属性，用于控制热键
+    const {domain} = this.props;
+    this.domainReaction = reaction(
+      () => this.store.loading,
+      data => {
+        domain.setBusy(data);
+      }
+    );
     // 兼容 affixOffsetTop 和 affixOffsetBottom
     if (
       typeof this.props.env.affixOffsetTop !== 'undefined' ||
@@ -98,6 +109,7 @@ export class RootRenderer extends React.Component<RootRendererProps> {
       'visibilitychange',
       this.handlePageVisibilityChange
     );
+    this.domainReaction?.();
   }
 
   handlePageVisibilityChange() {
@@ -445,6 +457,21 @@ export class RootRenderer extends React.Component<RootRendererProps> {
       : null;
   }
 
+  handleModalMounted(modal: any) {
+    // @ts-ignore
+    let domain = new Domain(
+      modal.modalDom,
+      modal.props.store,
+      modal.props.scope
+    );
+    domain.installHotKey();
+    modal.domain = domain;
+  }
+
+  handleModalUnMounted(modal: any) {
+    modal?.domain?.unInstallHotKey();
+  }
+
   renderDialog() {
     const {render, ...rest} = this.props;
     const store = this.store;
@@ -506,6 +533,8 @@ export class RootRenderer extends React.Component<RootRendererProps> {
         {
           render(pathPrefix!, schema, {
             ...rest,
+            onModalMounted: this.handleModalMounted,
+            onModalUnMounted: this.handleModalUnMounted,
             topStore: this.store,
             data: this.store.downStream,
             context: store.context,

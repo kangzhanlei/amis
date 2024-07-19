@@ -8,7 +8,8 @@ import {
   setVariable,
   setThemeClassName,
   ValidateError,
-  RendererEvent
+  RendererEvent,
+  Domain
 } from 'amis-core';
 import {Renderer, RendererProps} from 'amis-core';
 import {SchemaNode, Schema, ActionObject} from 'amis-core';
@@ -201,6 +202,7 @@ export default class Dialog extends React.Component<DialogProps> {
   reaction: any;
   isDead = false;
   $$id: string = guid();
+
   constructor(props: DialogProps) {
     super(props);
 
@@ -481,7 +483,7 @@ export default class Dialog extends React.Component<DialogProps> {
   }
 
   renderBody(body: SchemaNode, key?: any): React.ReactNode {
-    let {render, store} = this.props;
+    let {render, store, onModalMounted, onModalUnMounted} = this.props;
 
     if (Array.isArray(body)) {
       return body.map((body, key) => this.renderBody(body, key));
@@ -498,6 +500,8 @@ export default class Dialog extends React.Component<DialogProps> {
       onSaved: this.handleFormSaved,
       onActionSensor: this.handleActionSensor,
       btnDisabled: store.loading,
+      onModalMounted: onModalMounted,
+      onModalUnMounted: onModalUnMounted,
       syncLocation: false // 弹框中的 crud 一般不需要同步地址栏
     };
 
@@ -616,6 +620,8 @@ export default class Dialog extends React.Component<DialogProps> {
     return (
       <Wrapper
         {...rest}
+        scope={this.context}
+        kzl="kzl"
         classPrefix={classPrefix}
         className={cx(className)}
         style={style}
@@ -845,7 +851,9 @@ export default class Dialog extends React.Component<DialogProps> {
                 onConfirm: this.handleDialogConfirm,
                 onClose: this.handleDialogClose,
                 show: store.dialogOpen,
-                onAction: this.handleAction
+                onAction: this.handleAction,
+                onModalMounted: this.props.onModalMounted,
+                onModalUnMounted: this.props.onModalUnMounted
               }
             )
           : null}

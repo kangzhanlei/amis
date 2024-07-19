@@ -1,8 +1,17 @@
 import {action} from 'mobx';
 import {RendererAction} from '../actions';
-import {FormItemStore, IFormItemStore, IRendererStore} from '../store';
+import {
+  FormItemStore,
+  FormStore,
+  IFormItemStore,
+  IRendererStore,
+  ModalStore,
+  RendererStore,
+  StoreNode
+} from '../store';
 import {IScopedContext} from '../Scoped';
 import KeyStroke from './keyboard';
+import {ModalManager} from 'amis-ui';
 
 /**
  * 热键事件
@@ -31,18 +40,26 @@ export class Domain {
   /**
    * 构造domain实例
    * @param targetElement 挂载到哪个html的元素上
-   * @param rootStore 对应的rootStore数据，用于查找数据
+   * @param store 对应的rootStore数据，用于查找数据
    * @param scoped 对应的scoped范围，用于查找组件
    */
   constructor(
     targetElement: HTMLElement,
-    rootStore: IRendererStore,
+    store: IRendererStore,
     scoped: IScopedContext
   ) {
     this.targetElement = targetElement;
-    this.rootStore = rootStore;
+    this.store = store;
     this.scoped = scoped;
   }
+
+  //当前激活的对话框
+  activeDialog: any;
+  //当前激活的抽屉
+  activeDrawer: any;
+
+  //表示当前domain是否处于busy状态（也就是业务处理状态），该状态不允许执行热键
+  busy: boolean = false;
 
   /**
    * 当前激活的组件
@@ -50,7 +67,7 @@ export class Domain {
   listener: any;
 
   //根store,用于查找数据
-  rootStore: IRendererStore;
+  store: IRendererStore;
 
   //scoped，用于查找对象
   scoped: IScopedContext;
@@ -58,17 +75,73 @@ export class Domain {
   //挂载到哪个元素下
   targetElement: HTMLElement;
 
+  findFocusComponent(store) {
+    for (let child of store.children) {
+      if (child.storeType === FormStore.name) {
+        let result = this.findFocusComponent(child);
+        if (result) {
+          return result;
+        }
+      } else if (child.storeType === FormItemStore.name) {
+        if ((store as IFormItemStore).isFocused) {
+          return store;
+        }
+      } else {
+        break;
+      }
+    }
+  }
+
   keyPressed = () => {
     return (event: HotKeyEvent): boolean => {
       if (!this.scoped) {
         return false;
       }
-      if (this.rootStore) {
-        const focusStore = Object.values(this.rootStore.stores).find(
+      if (this.isBusy()) {
+        return false;
+      }
+      if (
+        ModalManager.current() > 0 &&
+        ModalManager.currentModal().domain != this
+      ) {
+        //如果有弹框，忽略
+        return false;
+      }
+      if (this.store && this.store.storeType === RendererStore.name) {
+        //表单什么的都有stores属性
+        const focusStore = Object.values(this.store.stores).find(
           store =>
             store.storeType === FormItemStore.name &&
             (store as IFormItemStore).isFocused
         );
+        event.focusStore = focusStore as IFormItemStore;
+      }
+      if (this.store && this.store.storeType === ModalStore.name) {
+        //如果是对话框的
+        let store = this.store as StoreNode;
+        let temp = store;
+        while (temp) {
+          for (let child of temp.children) {
+            if (child.storeType === FormStore.name) {
+              temp = child.children;
+            } else if (child.storeType === FormItemStore.name) {
+            } else {
+              break;
+            }
+          }
+        }
+        const focusStore = Object.values(store.children).find(store => {
+          if (store.storeType === FormStore.name) {
+            return Object.values(store.children).find(
+              t =>
+                t.storeType === FormItemStore.name &&
+                (t as IFormItemStore).isFocused
+            );
+          } else if (store.storeType === FormItemStore.name) {
+            return (store as IFormItemStore).isFocused;
+          }
+          return false;
+        });
         event.focusStore = focusStore as IFormItemStore;
       }
       let componentId = event.focusStore?.itemId;
@@ -92,6 +165,34 @@ export class Domain {
       return event.eat;
     };
   };
+
+  /**
+   * 设置当前业务处于busy状态，busy状态下不执行热键
+   * @param busy
+   */
+  @action.bound
+  setBusy(busy: boolean) {
+    this.busy = busy;
+  }
+
+  isBusy() {
+    return this.busy;
+  }
+
+  /**
+   * 在domain中执行业务逻辑，自动增加busy状态的处理
+   * @param fn
+   */
+  @action.bound
+  async doInDomain(fn: Function) {
+    this.busy = true;
+    try {
+      await fn();
+    } catch (err) {
+      console.log(err);
+    }
+    this.busy = false;
+  }
 
   /**
    * 注册热键功能

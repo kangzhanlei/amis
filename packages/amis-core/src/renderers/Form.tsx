@@ -1887,6 +1887,8 @@ export default class Form extends React.Component<FormProps, object> {
       labelAlign,
       labelWidth,
       static: isStatic,
+      onModalMounted,
+      onModalUnMounted,
       canAccessSuperData
     } = props;
 
@@ -1924,7 +1926,9 @@ export default class Form extends React.Component<FormProps, object> {
       removeHook: this.removeHook,
       renderFormItems: this.renderFormItems,
       formItemDispatchEvent: this.formItemDispatchEvent,
-      formPristine: form.pristine
+      formPristine: form.pristine,
+      onModalMounted: onModalMounted,
+      onModalUnMounted: onModalUnMounted
       // value: (control as any)?.name
       //   ? getVariable(form.data, (control as any)?.name, canAccessSuperData)
       //   : (control as any)?.value,
@@ -2048,7 +2052,9 @@ export default class Form extends React.Component<FormProps, object> {
             data: store.dialogData,
             onConfirm: this.handleDialogConfirm,
             onClose: this.handleDialogClose,
-            show: store.dialogOpen
+            show: store.dialogOpen,
+            onModalMounted: this.props.onModalMounted,
+            onModalUnMounted: this.props.onModalUnMounted
           }
         )}
 
@@ -2106,6 +2112,8 @@ export default class Form extends React.Component<FormProps, object> {
           className: cx(panelClassName, 'Panel--form'),
           style: style,
           formStore: this.props.store,
+          onModalMounted: this.props.onModalMounted,
+          onModalUnMounted: this.props.onModalUnMounted,
           children: body,
           actions: this.buildActions(),
           onAction: this.handleAction,

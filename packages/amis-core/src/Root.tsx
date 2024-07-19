@@ -92,9 +92,9 @@ export class Root extends React.Component<RootProps> {
   @autobind
   handleHotkey(event: HotKeyEvent) {
     const {onHotkey} = this.props;
-    if (event.key === 'Enter'.toLowerCase()) {
+    if (event.key === 'enter') {
       NavigateDomainAction(true)(event);
-    } else if (event.key === 'ArrowUp'.toLowerCase()) {
+    } else if (event.key === 'up') {
       NavigateDomainAction(false)(event);
     } else {
       onHotkey?.(event);
