@@ -75,21 +75,29 @@ export class Domain {
   //挂载到哪个元素下
   targetElement: HTMLElement;
 
-  findFocusComponent(store) {
-    for (let child of store.children) {
+  findFocusComponent(store): any {
+    let children = null;
+    if (store.storeType === RendererStore.name) {
+      children = Object.values(store.stores);
+    } else {
+      children = store.children;
+    }
+    if (!children) {
+      return null;
+    }
+    for (let child of children) {
       if (child.storeType === FormStore.name) {
         let result = this.findFocusComponent(child);
         if (result) {
           return result;
         }
       } else if (child.storeType === FormItemStore.name) {
-        if ((store as IFormItemStore).isFocused) {
-          return store;
+        if ((child as IFormItemStore).isFocused) {
+          return child;
         }
-      } else {
-        break;
       }
     }
+    return null;
   }
 
   keyPressed = () => {
@@ -107,41 +115,8 @@ export class Domain {
         //如果有弹框，忽略
         return false;
       }
-      if (this.store && this.store.storeType === RendererStore.name) {
-        //表单什么的都有stores属性
-        const focusStore = Object.values(this.store.stores).find(
-          store =>
-            store.storeType === FormItemStore.name &&
-            (store as IFormItemStore).isFocused
-        );
-        event.focusStore = focusStore as IFormItemStore;
-      }
-      if (this.store && this.store.storeType === ModalStore.name) {
-        //如果是对话框的
-        let store = this.store as StoreNode;
-        let temp = store;
-        while (temp) {
-          for (let child of temp.children) {
-            if (child.storeType === FormStore.name) {
-              temp = child.children;
-            } else if (child.storeType === FormItemStore.name) {
-            } else {
-              break;
-            }
-          }
-        }
-        const focusStore = Object.values(store.children).find(store => {
-          if (store.storeType === FormStore.name) {
-            return Object.values(store.children).find(
-              t =>
-                t.storeType === FormItemStore.name &&
-                (t as IFormItemStore).isFocused
-            );
-          } else if (store.storeType === FormItemStore.name) {
-            return (store as IFormItemStore).isFocused;
-          }
-          return false;
-        });
+      if (this.store) {
+        const focusStore = this.findFocusComponent(this.store);
         event.focusStore = focusStore as IFormItemStore;
       }
       let componentId = event.focusStore?.itemId;
@@ -323,12 +298,11 @@ function getPreviousFocusableElement(
 export const NavigateDomainAction = function (forward: boolean) {
   return (event: HotKeyEvent) => {
     let component = event.focusComponent;
-    if (component) {
-    }
     let model = event.focusStore;
     let target = forward
       ? getNextFocusableElement(document.activeElement)
       : getPreviousFocusableElement(document.activeElement);
+    model && model.blur();
     (target as HTMLElement)?.focus();
   };
 };
