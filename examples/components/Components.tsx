@@ -2,6 +2,7 @@ import React from 'react';
 import {Switch} from 'react-router-dom';
 import {navigations2route} from './App';
 import makeMarkdownRenderer from './MdRenderer';
+
 function wrapDoc(doc: any) {
   return {
     default: makeMarkdownRenderer(doc)
@@ -129,6 +130,13 @@ export const components = [
         path: '/zh-CN/components/action',
         component: React.lazy(() =>
           import('../../docs/zh-CN/components/action.md').then(wrapDoc)
+        )
+      },
+      {
+        label: 'HotKey 热键',
+        path: '/zh-CN/components/hotKey',
+        component: React.lazy(() =>
+          import('../../docs/zh-CN/components/hotkey.md').then(wrapDoc)
         )
       },
       {
@@ -267,7 +275,7 @@ export const components = [
         component: React.lazy(() =>
           import(
             '../../docs/zh-CN/components/form/button-group-select.md'
-          ).then(wrapDoc)
+            ).then(wrapDoc)
         )
       },
       {
@@ -365,7 +373,7 @@ export const components = [
         component: React.lazy(() =>
           import(
             '../../docs/zh-CN/components/form/input-datetime-range.md'
-          ).then(wrapDoc)
+            ).then(wrapDoc)
         )
       },
       {
@@ -561,7 +569,7 @@ export const components = [
         component: React.lazy(() =>
           import(
             '../../docs/zh-CN/components/form/input-quarter-range.md'
-          ).then(wrapDoc)
+            ).then(wrapDoc)
         )
       },
 
@@ -733,7 +741,7 @@ export const components = [
         component: React.lazy(() =>
           import(
             '../../docs/zh-CN/components/form/tabs-transfer-picker.md'
-          ).then(wrapDoc)
+            ).then(wrapDoc)
         )
       },
       {
@@ -802,7 +810,7 @@ export const components = [
         component: React.lazy(() =>
           import(
             '../../docs/zh-CN/components/form/input-verification-code.md'
-          ).then(wrapDoc)
+            ).then(wrapDoc)
         )
       }
     ]

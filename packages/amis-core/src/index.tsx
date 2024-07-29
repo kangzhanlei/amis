@@ -6,84 +6,81 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type {RendererConfig, RendererProps, RenderOptions} from './factory';
 import {
-  Renderer,
+  addSchemaFilter,
+  clearStoresCache,
+  defaultOptions,
+  extendDefaultEnv,
+  filterSchema,
   getRendererByName,
   getRenderers,
   registerRenderer,
-  unRegisterRenderer,
+  Renderer,
   resolveRenderer,
-  filterSchema,
-  clearStoresCache,
-  updateEnv,
   stores,
-  defaultOptions,
-  addSchemaFilter,
-  extendDefaultEnv
+  unRegisterRenderer,
+  updateEnv
 } from './factory';
-import type {RenderOptions, RendererConfig, RendererProps} from './factory';
 import './polyfills';
 import './renderers/builtin';
 import './renderers/register';
-export * from './utils/index';
-export * from './types';
-export * from './store';
 import * as utils from './utils/helper';
 import {getEnv} from 'mobx-state-tree';
-
-import {RegisterStore, RendererStore} from './store';
+import {domain, HotKeyEvent} from './hotkey/domain';
 import type {IColumn, IColumn2, IRow, IRow2} from './store';
+import {RegisterStore, RendererStore} from './store';
+import type {LocaleProps, TranslateFn} from './locale';
 import {
-  setDefaultLocale,
+  extendLocale,
   getDefaultLocale,
+  localeable,
   makeTranslator,
   register as registerLocale,
-  extendLocale,
   removeLocaleData,
-  localeable
+  setDefaultLocale
 } from './locale';
-import type {LocaleProps, TranslateFn} from './locale';
 
-import Scoped, {ScopedContext, filterTarget, splitTarget} from './Scoped';
-import type {ScopedComponentType, IScopedContext} from './Scoped';
+import type {IScopedContext, ScopedComponentType} from './Scoped';
+import Scoped, {filterTarget, ScopedContext, splitTarget} from './Scoped';
 
+import type {ClassNamesFn, ThemeProps} from './theme';
 import {
   classnames,
   getClassPrefix,
+  getTheme,
+  makeClassnames,
   setDefaultTheme,
   theme,
-  getTheme,
-  themeable,
-  makeClassnames
+  themeable
 } from './theme';
-import type {ClassNamesFn, ThemeProps} from './theme';
-const classPrefix = getClassPrefix();
-
-export * from './actions';
-import FormItem, {
-  FormItemWrap,
-  registerFormItem,
-  getFormItemByName
-} from './renderers/Item';
 import type {
   FormBaseControl,
   FormControlProps,
   FormItemProps
 } from './renderers/Item';
+import FormItem, {
+  FormItemWrap,
+  getFormItemByName,
+  registerFormItem
+} from './renderers/Item';
+import type {
+  FormOptionsControl,
+  OptionsControlProps
+} from './renderers/Options';
 import {OptionsControl, registerOptionsControl} from './renderers/Options';
-import type {OptionsControlProps} from './renderers/Options';
-import type {FormOptionsControl} from './renderers/Options';
 import {Schema} from './types';
 import ScopedRootRenderer, {addRootWrapper, RootRenderProps} from './Root';
 import {envOverwrite} from './envOverwrite';
-import {EnvContext} from './env';
 import type {RendererEnv} from './env';
+import {EnvContext} from './env';
 import React from 'react';
+import type {FilterContext} from 'amis-formula';
 import {
+  AsyncEvaluator,
   evaluate,
   evaluateForAsync,
   Evaluator,
-  AsyncEvaluator,
   extendsFilters,
   filters,
   getFilters,
@@ -92,26 +89,33 @@ import {
   registerFilter,
   registerFunction
 } from 'amis-formula';
-import type {FilterContext} from 'amis-formula';
 import LazyComponent from './components/LazyComponent';
 import Overlay from './components/Overlay';
 import PopOver from './components/PopOver';
 import ErrorBoundary from './components/ErrorBoundary';
-import {FormRenderer} from './renderers/Form';
 import type {FormHorizontal, FormSchemaBase} from './renderers/Form';
+import {FormRenderer} from './renderers/Form';
+import type {OnEventProps} from './utils/index';
 import {
-  enableDebug,
   disableDebug,
+  enableDebug,
   promisify,
   replaceText,
   wrapFetcher
 } from './utils/index';
-import type {OnEventProps} from './utils/index';
 import {valueMap as styleMap} from './utils/style-helper';
 import {RENDERER_TRANSMISSION_OMIT_PROPS} from './SchemaRenderer';
 import type {IItem} from './store/list';
 import CustomStyle from './components/CustomStyle';
 import {StatusScoped} from './StatusScoped';
+
+export * from './utils/index';
+export * from './types';
+export * from './store';
+export * from './hotkey/domain';
+const classPrefix = getClassPrefix();
+
+export * from './actions';
 
 // @ts-ignore
 export const version = '__buildVersion';
@@ -323,6 +327,10 @@ function AMISRenderer({
     return schema;
   }, [schema, locale]);
 
+  function processHotKey(event: HotKeyEvent) {
+    //根组件，什么也不做。
+  }
+
   return (
     <EnvContext.Provider value={env}>
       <ScopedRootRenderer
@@ -330,6 +338,7 @@ function AMISRenderer({
         schema={schema}
         pathPrefix={pathPrefix}
         rootStore={store}
+        onHotkey={processHotKey}
         env={env}
         theme={theme}
         locale={locale}

@@ -202,7 +202,7 @@ export function embed(
       }
 
       // 支持返回各种报错信息
-      config.validateStatus = function () {
+      config.validateStatus = function() {
         return true;
       };
 
@@ -224,7 +224,8 @@ export function embed(
               '{{redirect}}',
               encodeURIComponent(location.href)
             );
-            return new Promise(() => {});
+            return new Promise(() => {
+            });
           } else if (response.data.msg) {
             throw new Error(response.data.msg);
           } else {
@@ -255,6 +256,7 @@ export function embed(
   };
 
   let amisProps: any = {};
+
   function createElements(props: any): any {
     amisProps = {
       ...amisProps,
@@ -293,6 +295,7 @@ export function embed(
     );
   }
 
+  console.log('哇哈哈哈哈');
   const root = createRoot(container);
   root.render(createElements(props));
 

@@ -1,45 +1,43 @@
 import React from 'react';
-import extend from 'lodash/extend';
 import {Renderer, RendererProps} from '../factory';
 import {FormStore, IFormStore} from '../store/form';
 import {
-  Api,
-  SchemaNode,
-  Schema,
   ActionObject,
-  Payload,
-  ClassName,
+  Api,
   BaseApiObject,
+  ClassName,
+  Payload,
+  Schema,
+  SchemaClassName,
   SchemaExpression,
-  SchemaClassName
+  SchemaNode
 } from '../types';
-import {filter, evalExpression} from '../utils/tpl';
+import {evalExpression, filter} from '../utils/tpl';
 import getExprProperties from '../utils/filter-schema';
 import {
-  promisify,
-  difference,
-  until,
-  noop,
-  isObject,
-  isVisible,
   cloneObject,
-  SkipOperation,
+  createObject,
+  difference,
   isEmpty,
-  getVariable,
+  isObject,
   isObjectShallowModified,
+  isVisible,
+  noop,
+  promisify,
   qsparse,
   repeatCount,
-  createObject
+  SkipOperation,
+  until
 } from '../utils/helper';
 
 import debouce from 'lodash/debounce';
 import flatten from 'lodash/flatten';
 import find from 'lodash/find';
 import {
-  ScopedContext,
+  filterTarget,
   IScopedContext,
   ScopedComponentType,
-  filterTarget
+  ScopedContext
 } from '../Scoped';
 
 import {IComboStore} from '../store/combo';
@@ -355,6 +353,7 @@ export type FormGroup = FormSchemaBase & {
   className?: string;
 };
 export type FormGroupNode = FormGroup | FormGroupArray;
+
 export interface FormGroupArray extends Array<FormGroupNode> {}
 
 export interface FormProps
@@ -395,6 +394,7 @@ export interface FormProps
     show?: boolean;
   };
 }
+
 export default class Form extends React.Component<FormProps, object> {
   static defaultProps = {
     title: 'Form.title',
@@ -475,6 +475,11 @@ export default class Form extends React.Component<FormProps, object> {
     leading: false
   });
   unBlockRouting?: () => void;
+  // 如果开启了 lazyChange，需要一个 flush 方法把队列中值应用上。
+  flushing = false;
+  emittedData: any = null;
+  emitting = false;
+
   constructor(props: FormProps) {
     super(props);
 
@@ -983,8 +988,6 @@ export default class Form extends React.Component<FormProps, object> {
     );
   }
 
-  // 如果开启了 lazyChange，需要一个 flush 方法把队列中值应用上。
-  flushing = false;
   async flush() {
     try {
       if (this.flushing) {
@@ -1061,13 +1064,12 @@ export default class Form extends React.Component<FormProps, object> {
       store.setLocalPersistData(persistDataKeys);
     }
   }
+
   formItemDispatchEvent(type: string, data: any) {
     const {dispatchEvent} = this.props;
     return dispatchEvent(type, data);
   }
 
-  emittedData: any = null;
-  emitting = false;
   async emitChange(submit: boolean, emitedFromWatch: boolean = false) {
     try {
       this.emitting = true;
@@ -1885,6 +1887,8 @@ export default class Form extends React.Component<FormProps, object> {
       labelAlign,
       labelWidth,
       static: isStatic,
+      onModalMounted,
+      onModalUnMounted,
       canAccessSuperData
     } = props;
 
@@ -1913,6 +1917,7 @@ export default class Form extends React.Component<FormProps, object> {
         (control as Schema).disabled ||
         (form.loading ? true : undefined),
       btnDisabled: disabled || form.loading || form.validating,
+      onHotkey: this.handleHotkey.bind(this),
       onAction: this.handleAction,
       onQuery: this.handleQuery,
       onChange: this.handleChange,
@@ -1921,7 +1926,9 @@ export default class Form extends React.Component<FormProps, object> {
       removeHook: this.removeHook,
       renderFormItems: this.renderFormItems,
       formItemDispatchEvent: this.formItemDispatchEvent,
-      formPristine: form.pristine
+      formPristine: form.pristine,
+      onModalMounted: onModalMounted,
+      onModalUnMounted: onModalUnMounted
       // value: (control as any)?.name
       //   ? getVariable(form.data, (control as any)?.name, canAccessSuperData)
       //   : (control as any)?.value,
@@ -2014,9 +2021,13 @@ export default class Form extends React.Component<FormProps, object> {
           }
         )}
 
-        {this.renderFormItems({
-          body
-        })}
+        {this.renderFormItems(
+          {
+            body
+          },
+          '',
+          {onHotkey: this.handleHotkey.bind(this)}
+        )}
 
         {padDom}
 
@@ -2041,7 +2052,9 @@ export default class Form extends React.Component<FormProps, object> {
             data: store.dialogData,
             onConfirm: this.handleDialogConfirm,
             onClose: this.handleDialogClose,
-            show: store.dialogOpen
+            show: store.dialogOpen,
+            onModalMounted: this.props.onModalMounted,
+            onModalUnMounted: this.props.onModalUnMounted
           }
         )}
 
@@ -2099,6 +2112,8 @@ export default class Form extends React.Component<FormProps, object> {
           className: cx(panelClassName, 'Panel--form'),
           style: style,
           formStore: this.props.store,
+          onModalMounted: this.props.onModalMounted,
+          onModalUnMounted: this.props.onModalUnMounted,
           children: body,
           actions: this.buildActions(),
           onAction: this.handleAction,
@@ -2128,6 +2143,7 @@ export default class Form extends React.Component<FormProps, object> {
   type: 'form',
   storeType: FormStore.name,
   isolateScope: true,
+  // hotkeyActions: [{key: 'F4', action: 'handleSubmit', scope: '表单'}],
   storeExtendsData: (props: any) => props.inheritData,
   shouldSyncSuperStore: (store, props, prevProps) => {
     // 如果是 QuickEdit，让 store 同步 __super 数据。
@@ -2184,6 +2200,10 @@ export class FormRenderer extends Form {
     throwErrors: boolean = false
   ) {
     return this.handleAction(undefined, action, data, throwErrors);
+  }
+
+  handleSubmit() {
+    // console.log('提交表单。。。');
   }
 
   async handleAction(

@@ -369,6 +369,7 @@ export interface OtherActionSchema extends ButtonSchema {
     | 'add'
     | 'reset'
     | 'reset-and-submit';
+
   [propName: string]: any;
 }
 
@@ -1091,7 +1092,8 @@ export class ActionRenderer extends React.Component<ActionRendererProps> {
 }
 
 @Renderer({
-  type: 'button'
+  type: 'button',
+  ignoreHotkeys: ['Enter']
 })
 export class ButtonRenderer extends ActionRenderer {}
 

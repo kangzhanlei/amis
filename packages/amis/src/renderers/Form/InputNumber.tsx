@@ -177,12 +177,12 @@ export default class NumberControl extends React.Component<
   NumberProps,
   NumberState
 > {
-  input?: HTMLInputElement;
   static defaultProps: Partial<NumberProps> = {
     step: 1,
     resetValue: '',
     clearValueOnEmpty: false
   };
+  input?: HTMLInputElement;
 
   constructor(props: NumberProps) {
     super(props);
@@ -324,6 +324,20 @@ export default class NumberControl extends React.Component<
     dispatchEvent(eventName, resolveEventData(this.props, {value}));
   }
 
+  @autobind
+  async handleFocus(e: any) {
+    const {dispatchEvent, onFocus} = this.props;
+    onFocus?.(e);
+    await dispatchEvent('focus', {});
+  }
+
+  @autobind
+  async handleBlur(e: any) {
+    const {dispatchEvent, onBlur} = this.props;
+    onBlur?.(e);
+    await dispatchEvent('blur', {});
+  }
+
   async handleChange(inputValue: any) {
     const {onChange, dispatchEvent, clearValueOnEmpty} = this.props;
     const value = this.getValue(inputValue);
@@ -372,6 +386,7 @@ export default class NumberControl extends React.Component<
       this.input.setSelectionRange?.(pos, pos);
     }
   }
+
   filterNum(value: number | string | undefined): number | undefined;
   filterNum(
     value: number | string | undefined,
@@ -426,10 +441,12 @@ export default class NumberControl extends React.Component<
       this.setState({unitOptions: normalizeOptions(this.props.unitOptions)});
     }
   }
+
   @autobind
   inputRef(ref: any) {
     this.input = ref;
   }
+
   focus() {
     if (!this.input) {
       return;
@@ -441,6 +458,7 @@ export default class NumberControl extends React.Component<
   render() {
     const {
       className,
+      onFocus,
       style,
       classPrefix: ns,
       value,
@@ -554,8 +572,8 @@ export default class NumberControl extends React.Component<
           showSteps={showSteps}
           borderMode={borderMode}
           readOnly={readOnly}
-          onFocus={() => this.dispatchEvent('focus')}
-          onBlur={() => this.dispatchEvent('blur')}
+          onFocus={this.handleFocus}
+          onBlur={this.handleBlur}
           keyboard={keyboard}
           displayMode={displayMode}
           big={big}

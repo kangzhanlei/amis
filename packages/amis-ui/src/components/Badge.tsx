@@ -285,6 +285,7 @@ export function withBadge<P extends object>(Component: React.ComponentType<P>) {
       static displayName = `WithBadge(${
         Component.displayName || Component.name
       })`;
+      static ComposedComponent = Component;
 
       render() {
         const badge = this.props.badge;

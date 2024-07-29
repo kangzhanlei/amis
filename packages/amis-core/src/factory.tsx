@@ -1,23 +1,23 @@
 import React from 'react';
-import {RendererStore, IRendererStore, IIRendererStore} from './store/index';
-import {getEnv, destroy} from 'mobx-state-tree';
+import {IIRendererStore, IRendererStore, RendererStore} from './store/index';
+import {destroy, getEnv} from 'mobx-state-tree';
 import {wrapFetcher} from './utils/api';
 import {normalizeLink} from './utils/normalizeLink';
 import {
   findIndex,
+  isMobile,
+  parseQuery,
   promisify,
   qsparse,
   string2regExp,
-  parseQuery,
-  isMobile,
   TestIdBuilder
 } from './utils/helper';
 import {
-  fetcherResult,
-  SchemaNode,
-  Schema,
   EventTrack,
-  PlainObject
+  fetcherResult,
+  PlainObject,
+  Schema,
+  SchemaNode
 } from './types';
 import {observer} from 'mobx-react';
 import Scoped from './Scoped';
@@ -29,6 +29,8 @@ import type {RendererEnv} from './env';
 import {OnEventProps, RendererEvent} from './utils/renderer-event';
 import {Placeholder} from './renderers/Placeholder';
 import {StatusScopedProps} from './StatusScoped';
+import {Domain, HotKeyEvent} from './hotkey/domain';
+import {HotKeyConfig} from './renderers/Item';
 
 export interface TestFunc {
   (
@@ -57,6 +59,8 @@ export interface RendererBasicConfig {
   isolateScope?: boolean;
   isFormItem?: boolean;
   autoVar?: boolean; // 自动解析变量
+  hotkeyActions?: HotKeyConfig[]; //对哪些热键敏感，当热键发生的时候，触发什么动作。
+  ignoreHotkeys?: string[]; //要求别人忽略哪些热键，就是不要把这些键当热键处理（比如按钮上按回车时，冒泡到顶层，顶层给导航到下一个节点就不好了,应该触发按钮的点击才对）
   // [propName:string]:any;
 }
 
@@ -91,6 +95,8 @@ export interface RendererProps
     renderer?: React.Component<RendererProps>
   ) => Promise<RendererEvent<any>>;
   mobileUI?: boolean;
+  domain: Domain;
+
   [propName: string]: any;
 }
 
@@ -196,6 +202,50 @@ export function registerRenderer(config: RendererConfig): RendererConfig {
 
   if (config.isolateScope) {
     config.component = Scoped(config.component, config.type);
+  }
+  //获取被@renderer等绑定的原始类型比如TextControl啥的
+  let Component = config.component?.ComposedComponent;
+  if (Component && Component.prototype) {
+    Component.prototype['__HOTKEY__'] = {};
+    Component.prototype['__IGNORE_HOTKEY__'] = [];
+    //注册handleHotkey方法，实现ScopedComponentType里的handleHotkey接口
+    if (!Component.prototype['handleHotkey']) {
+      Component.prototype.handleHotkey = function (e: HotKeyEvent) {
+        let registry = this['__HOTKEY__'];
+        if (registry) {
+          //执行组件对应的热键方法，如果eat为true表示事件被这个组件吃掉了，不再冒泡，同时也终止传播
+          registry && registry[e.key] && registry[e.key].call(this, e);
+          if (!e.eat) {
+            //热键执行也是冒泡的，向上冒，直到最外层
+            const {onHotkey: parentOnHotkey} = this.props;
+            parentOnHotkey?.(e);
+          }
+        } else {
+          //组件本身没有处理，冒泡看上层处理不处理
+          const {onHotkey: parentOnHotkey} = this.props;
+          parentOnHotkey?.(e);
+        }
+      };
+    }
+    //处理热键功能
+    if (config.hotkeyActions) {
+      //给@装饰器配置的{热键：函数}绑定一下，绑定热键和renderer里对应的函数
+      config.hotkeyActions.forEach(({key, action, scope}) => {
+        let registry = Component.prototype['__HOTKEY__'];
+        let fn = Component.prototype[action];
+        registry[key] = function (e: HotKeyEvent) {
+          fn.call(this, e);
+        };
+        registry[key].scope = scope;
+        console.log(`[${config.type}]注册热键: [${key}]==>${action}`);
+      });
+    }
+    //处理忽略的热键，就是冒泡到上层的时候，上层也不要处理这个事件，让他走默认的动作，比如按钮上按回车就是点击，不是导航
+    if (config.ignoreHotkeys) {
+      let ignores = Component.prototype['__IGNORE_HOTKEY__'];
+      ignores.push(...config.ignoreHotkeys);
+      console.log(`[${config.type}]忽略导航热键[${ignores}]`);
+    }
   }
 
   const idx = findIndex(
@@ -429,6 +479,7 @@ export function extendDefaultEnv(env: Partial<RenderOptions>) {
 }
 
 let cache: {[propName: string]: RendererConfig} = {};
+
 export function resolveRenderer(
   path: string,
   schema?: Schema

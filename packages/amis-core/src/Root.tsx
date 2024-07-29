@@ -5,19 +5,28 @@ import {RendererProps} from './factory';
 import {LocaleContext, TranslateFn} from './locale';
 import {RootRenderer} from './RootRenderer';
 import {SchemaRenderer} from './SchemaRenderer';
-import Scoped from './Scoped';
+import Scoped, {IScopedContext, ScopedContext} from './Scoped';
 import {IRendererStore} from './store';
 import {ThemeContext} from './theme';
 import {Schema, SchemaNode} from './types';
 import {autobind, isEmpty} from './utils/helper';
 import {RootStoreContext} from './WithRootStore';
 import {StatusScoped, StatusScopedProps} from './StatusScoped';
+import {
+  Domain,
+  HotkeyBinding,
+  HotKeyEvent,
+  NavigateDomainAction
+} from './hotkey/domain';
+import {findDOMNode} from 'react-dom';
 
 export interface RootRenderProps {
   location?: Location;
   theme?: string;
   data?: Record<string, any>;
   locale?: string;
+  hotkeyBindings?: HotkeyBinding[];
+
   [propName: string]: any;
 }
 
@@ -29,6 +38,7 @@ export interface RootProps extends StatusScopedProps {
   pathPrefix?: string;
   locale?: string;
   translate?: TranslateFn;
+
   [propName: string]: any;
 }
 
@@ -40,6 +50,7 @@ export interface RootWrapperProps {
   theme: string;
   data?: Record<string, any>;
   context?: Record<string, any>;
+
   [propName: string]: any;
 }
 
@@ -52,6 +63,23 @@ export function addRootWrapper(
 }
 
 export class Root extends React.Component<RootProps> {
+  static contextType = ScopedContext;
+  domain: Domain;
+
+  componentDidMount() {
+    const {rootStore} = this.props;
+    this.domain = new Domain(
+      findDOMNode(this),
+      rootStore,
+      this.context as IScopedContext
+    );
+    this.domain.installHotKey();
+  }
+
+  componentWillUnmount() {
+    this.domain.unInstallHotKey();
+  }
+
   @autobind
   resolveDefinitions(name: string) {
     const definitions = (this.props.schema as Schema).definitions;
@@ -59,6 +87,18 @@ export class Root extends React.Component<RootProps> {
       return {};
     }
     return definitions && definitions[name];
+  }
+
+  @autobind
+  handleHotkey(event: HotKeyEvent) {
+    const {onHotkey} = this.props;
+    if (event.key === 'enter' || event.key === 'right') {
+      NavigateDomainAction(true)(event);
+    } else if (event.key === 'up' || event.key === 'left') {
+      NavigateDomainAction(false)(event);
+    } else {
+      onHotkey?.(event);
+    }
   }
 
   render() {
@@ -130,6 +170,7 @@ export class Root extends React.Component<RootProps> {
                       location={location}
                       data={data}
                       context={context}
+                      onHotkey={this.handleHotkey}
                       env={env}
                       classnames={theme.classnames}
                       classPrefix={theme.classPrefix}
@@ -152,6 +193,7 @@ export interface renderChildProps
     StatusScopedProps {
   env: RendererEnv;
 }
+
 export type ReactElement = React.ReactNode[] | JSX.Element | null | false;
 
 const StatusScopedSchemaRenderer = StatusScoped(SchemaRenderer);

@@ -47,6 +47,7 @@ import PopOver from '../components/PopOver';
 import CustomStyle from '../components/CustomStyle';
 import classNames from 'classnames';
 import isPlainObject from 'lodash/isPlainObject';
+import {HotKeyEvent} from '../hotkey/domain';
 
 export type LabelAlign = 'right' | 'left' | 'top' | 'inherit';
 
@@ -465,6 +466,12 @@ export interface FormBaseControl extends BaseSchemaWithoutType {
   row?: number; // flex模式下指定所在的行数
 }
 
+export interface HotKeyConfig {
+  key: string;
+  action: string;
+  scope?: string;
+}
+
 export interface FormItemBasicConfig extends Partial<RendererConfig> {
   type?: string;
   wrap?: boolean;
@@ -485,7 +492,6 @@ export interface FormItemBasicConfig extends Partial<RendererConfig> {
   weight?: number;
   extendsData?: boolean;
   showErrorMsg?: boolean;
-
   // 兼容老用法，新用法直接在 Component 里面定义 validate 方法即可。
   validate?: (values: any, value: any) => string | boolean;
 }
@@ -608,573 +614,6 @@ const getItemInputClassName = (props: FormItemProps) => {
 };
 
 export class FormItemWrap extends React.Component<FormItemProps> {
-  lastSearchTerm: any;
-  target: HTMLElement;
-  mounted = false;
-  initedOptionFilled = false;
-  initedApiFilled = false;
-  toDispose: Array<() => void> = [];
-
-  constructor(props: FormItemProps) {
-    super(props);
-
-    this.state = {
-      isOpened: false
-    };
-
-    const {formItem: model, formInited, addHook, initAutoFill} = props;
-    if (!model) {
-      return;
-    }
-
-    this.toDispose.push(
-      reaction(
-        () =>
-          `${model.errors.join('')}${model.isFocused}${
-            model.dialogOpen
-          }${JSON.stringify(model.filteredOptions)}`,
-        () => this.forceUpdate()
-      )
-    );
-
-    let onInit = () => {
-      this.initedOptionFilled = true;
-      initAutoFill !== false &&
-        isAlive(model) &&
-        this.syncOptionAutoFill(
-          model.getSelectedOptions(model.tmpValue),
-          initAutoFill === 'fillIfNotSet'
-        );
-      this.initedApiFilled = true;
-      initAutoFill !== false &&
-        isAlive(model) &&
-        this.syncApiAutoFill(
-          model.tmpValue ?? '',
-          false,
-          initAutoFill === 'fillIfNotSet'
-        );
-
-      this.toDispose.push(
-        reaction(
-          () => JSON.stringify(model.tmpValue),
-          () =>
-            this.mounted &&
-            this.initedApiFilled &&
-            this.syncApiAutoFill(model.tmpValue)
-        )
-      );
-
-      this.toDispose.push(
-        reaction(
-          () => JSON.stringify(model.getSelectedOptions(model.tmpValue)),
-          () =>
-            this.mounted &&
-            this.initedOptionFilled &&
-            this.syncOptionAutoFill(model.getSelectedOptions(model.tmpValue))
-        )
-      );
-    };
-    this.toDispose.push(
-      formInited || !addHook
-        ? model.addInitHook(onInit, 999)
-        : addHook(onInit, 'init', 'post')
-    );
-  }
-
-  componentDidMount() {
-    this.mounted = true;
-    this.target = findDOMNode(this) as HTMLElement;
-  }
-
-  componentDidUpdate(prevProps: FormItemProps) {
-    const props = this.props;
-    const {formItem: model} = props;
-
-    if (
-      isEffectiveApi(props.autoFill?.api, props.data) &&
-      isApiOutdated(
-        prevProps.autoFill?.api,
-        props.autoFill?.api,
-        prevProps.data,
-        props.data
-      )
-    ) {
-      this.syncApiAutoFill(model?.tmpValue, true);
-    }
-  }
-
-  componentWillUnmount() {
-    this.syncApiAutoFill.cancel();
-    this.mounted = false;
-    this.toDispose.forEach(fn => fn());
-    this.toDispose = [];
-  }
-
-  @autobind
-  handleFocus(e: any) {
-    const {formItem: model, autoFill} = this.props;
-    model && model.focus();
-    this.props.onFocus && this.props.onFocus(e);
-
-    if (
-      !autoFill ||
-      (autoFill && !autoFill?.hasOwnProperty('showSuggestion'))
-    ) {
-      return;
-    }
-    this.handleAutoFill('focus');
-  }
-
-  @autobind
-  handleBlur(e: any) {
-    const {formItem: model} = this.props;
-    model && model.blur();
-    this.props.onBlur && this.props.onBlur(e);
-  }
-
-  handleAutoFill(type: string) {
-    const {autoFill, onBulkChange, formItem, data} = this.props;
-    const {trigger, mode} = autoFill;
-    if (trigger === type && mode === 'popOver') {
-      // 参照录入 popOver形式
-      this.setState({
-        isOpened: true
-      });
-    } else if (
-      // 参照录入 dialog | drawer
-      trigger === type &&
-      (mode === 'dialog' || mode === 'drawer')
-    ) {
-      formItem?.openDialog(
-        this.buildAutoFillSchema(),
-        data,
-        (confirmed, result) => {
-          if (!result?.selectedItems) {
-            return;
-          }
-
-          this.updateAutoFillData(result.selectedItems);
-        }
-      );
-    }
-  }
-
-  updateAutoFillData(context: any) {
-    const {formStore, autoFill, onBulkChange} = this.props;
-    const {fillMapping, multiple} = autoFill;
-    // form原始数据
-    const data = formStore?.data;
-    const contextData = createObject(
-      {items: !multiple ? [context] : context, ...data},
-      {...context}
-    );
-    let responseData: any = {};
-    responseData = dataMapping(fillMapping, contextData);
-
-    if (!multiple && !fillMapping) {
-      responseData = context;
-    }
-
-    onBulkChange?.(responseData);
-  }
-
-  syncApiAutoFill = debounce(
-    async (term: any, forceLoad?: boolean, skipIfExits = false) => {
-      try {
-        const {autoFill, onBulkChange, formItem, data} = this.props;
-
-        // 参照录入
-        if (
-          !onBulkChange ||
-          !formItem ||
-          !autoFill ||
-          (autoFill && !autoFill?.hasOwnProperty('api'))
-        ) {
-          return;
-        } else if (
-          skipIfExits &&
-          (!autoFill.fillMapping ||
-            Object.keys(autoFill.fillMapping).some(
-              key => typeof getVariable(data, key) !== 'undefined'
-            ))
-        ) {
-          // 只要目标填充值有一个有值，就初始不自动填充
-          return;
-        }
-
-        if (autoFill?.showSuggestion) {
-          this.handleAutoFill('change');
-        } else {
-          // 自动填充
-          const itemName = formItem.name;
-          const ctx = createObject(data, {
-            [itemName || '']: term,
-            __term: term
-          });
-          if (
-            forceLoad ||
-            (isEffectiveApi(autoFill.api, ctx) && this.lastSearchTerm !== term)
-          ) {
-            let result = await formItem.loadAutoUpdateData(
-              autoFill.api,
-              ctx,
-              !!(autoFill.api as BaseApiObject)?.silent
-            );
-
-            this.lastSearchTerm =
-              (result && getVariable(result, itemName)) ?? term;
-
-            // 如果没有返回不应该处理
-            if (!result) {
-              return;
-            }
-
-            if (autoFill?.fillMapping) {
-              result = dataMapping(autoFill.fillMapping, result);
-            }
-
-            if (result) {
-              // 不能把自己给清了吧
-              setVariable(
-                result,
-                itemName,
-                getVariable(result, itemName) || formItem.tmpValue
-              );
-
-              onBulkChange?.(result);
-            }
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    },
-    250,
-    {
-      trailing: true,
-      leading: false
-    }
-  );
-
-  syncOptionAutoFill(selectedOptions: Array<any>, skipIfExits = false) {
-    const {autoFill, multiple, onBulkChange, data} = this.props;
-    const formItem = this.props.formItem as IFormItemStore;
-    // 参照录入｜自动填充
-    if (autoFill?.hasOwnProperty('api')) {
-      return;
-    }
-
-    if (
-      onBulkChange &&
-      autoFill &&
-      !isEmpty(autoFill) &&
-      formItem.filteredOptions.length
-    ) {
-      const toSync = dataMapping(
-        autoFill,
-        multiple
-          ? {
-              items: selectedOptions.map(item =>
-                createObject(
-                  {
-                    ...data,
-                    ancestors: getTreeAncestors(
-                      formItem.filteredOptions,
-                      item,
-                      true
-                    )
-                  },
-                  item
-                )
-              )
-            }
-          : createObject(
-              {
-                ...data,
-                ancestors: getTreeAncestors(
-                  formItem.filteredOptions,
-                  selectedOptions[0],
-                  true
-                )
-              },
-              selectedOptions[0]
-            )
-      );
-      const tmpData = {...data};
-      const result = {...toSync};
-
-      Object.keys(autoFill).forEach(key => {
-        const keys = keyToPath(key);
-        let value = getVariable(toSync, key);
-
-        if (skipIfExits) {
-          const originValue = getVariable(data, key);
-          if (typeof originValue !== 'undefined') {
-            value = originValue;
-          }
-        }
-
-        setVariable(result, key, value);
-
-        // 如果左边的 key 是一个路径
-        // 这里不希望直接把原始对象都给覆盖没了
-        // 而是保留原始的对象，只修改指定的属性
-        if (keys.length > 1 && isPlainObject(tmpData[keys[0]])) {
-          // 存在情况：依次更新同一子路径的多个key，eg: a.b.c1 和 a.b.c2，所以需要同步更新data
-          setVariable(tmpData, key, value);
-          result[keys[0]] = tmpData[keys[0]];
-        }
-      });
-
-      onBulkChange(result);
-    }
-  }
-
-  buildAutoFillSchema() {
-    const {
-      render,
-      autoFill,
-      classPrefix: ns,
-      classnames: cx,
-      translate: __
-    } = this.props;
-    if (!autoFill || (autoFill && !autoFill?.hasOwnProperty('api'))) {
-      return;
-    }
-    const {
-      api,
-      mode,
-      size,
-      offset,
-      position,
-      multiple,
-      filter,
-      columns,
-      labelField,
-      popOverContainer,
-      popOverClassName,
-      valueField
-    } = autoFill;
-    const form = {
-      type: 'form',
-      // debug: true,
-      title: '',
-      className: 'suggestion-form',
-      body: {
-        type: 'picker',
-        embed: true,
-        joinValues: false,
-        label: false,
-        labelField,
-        valueField: valueField || 'value',
-        multiple,
-        name: 'selectedItems',
-        options: [],
-        required: true,
-        source: api,
-        pickerSchema: {
-          type: 'crud',
-          affixHeader: false,
-          alwaysShowPagination: true,
-          keepItemSelectionOnPageChange: true,
-          headerToolbar: [],
-          footerToolbar: [
-            {
-              type: 'pagination',
-              align: 'left'
-            },
-            {
-              type: 'bulkActions',
-              align: 'right',
-              className: 'ml-2'
-            }
-          ],
-          multiple,
-          filter,
-          columns: columns || []
-        }
-      },
-      actions: [
-        {
-          type: 'button',
-          actionType: 'cancel',
-          label: __('cancel')
-        },
-        {
-          type: 'submit',
-          actionType: 'submit',
-          level: 'primary',
-          label: __('confirm')
-        }
-      ]
-    };
-
-    if (mode === 'popOver') {
-      return (
-        <Overlay
-          container={popOverContainer || this.target}
-          target={() => this.target}
-          placement={position || 'left-bottom-left-top'}
-          show
-        >
-          <PopOver
-            classPrefix={ns}
-            className={cx(`${ns}Autofill-popOver`, popOverClassName)}
-            style={{
-              minWidth: this.target ? this.target.offsetWidth : undefined
-            }}
-            offset={offset}
-            onHide={this.handleClose}
-            overlay
-          >
-            {render('popOver-auto-fill-form', form, {
-              onAction: this.handleAction,
-              onSubmit: this.handleSubmit
-            })}
-          </PopOver>
-        </Overlay>
-      );
-    } else {
-      return {
-        type: mode,
-        className: 'auto-fill-dialog',
-        title: __('FormItem.autoFillSuggest'),
-        size,
-        body: {
-          ...form,
-          wrapWithPanel: false
-        },
-        actions: [
-          {
-            type: 'button',
-            actionType: 'cancel',
-            label: __('cancel')
-          },
-          {
-            type: 'submit',
-            actionType: 'submit',
-            level: 'primary',
-            label: __('confirm')
-          }
-        ]
-      };
-    }
-  }
-
-  // 参照录入popOver提交
-  @autobind
-  handleSubmit(values: any) {
-    const {onBulkChange, autoFill} = this.props;
-    if (!autoFill || (autoFill && !autoFill?.hasOwnProperty('api'))) {
-      return;
-    }
-
-    this.updateAutoFillData(values.selectedItems);
-    this.handleClose();
-  }
-
-  @autobind
-  handleAction(e: React.UIEvent<any>, action: ActionObject, data: object) {
-    if (action.actionType === 'cancel') {
-      this.handleClose();
-    }
-  }
-
-  @autobind
-  handleClose() {
-    this.setState({
-      isOpened: false
-    });
-  }
-
-  @autobind
-  async handleOpenDialog(schema: Schema, data: any) {
-    const {formItem: model} = this.props;
-    if (!model) {
-      return;
-    }
-
-    return new Promise(resolve =>
-      model.openDialog(schema, data, (confirmed: any, value: any) =>
-        resolve(confirmed ? value : false)
-      )
-    );
-  }
-
-  @autobind
-  handleDialogConfirm([values]: Array<any>) {
-    const {formItem: model} = this.props;
-    if (!model) {
-      return;
-    }
-
-    model.closeDialog(true, values);
-  }
-
-  @autobind
-  handleDialogClose(confirmed = false) {
-    const {formItem: model} = this.props;
-    if (!model) {
-      return;
-    }
-    model.closeDialog(confirmed);
-  }
-
-  renderControl(): JSX.Element | null {
-    const {
-      // 这里解构，不可轻易删除，避免被rest传到子组件
-      inputClassName,
-      formItem: model,
-      classnames: cx,
-      children,
-      type,
-      renderControl,
-      formItemConfig,
-      sizeMutable,
-      size,
-      defaultSize,
-      mobileUI,
-      ...rest
-    } = this.props;
-
-    if (renderControl) {
-      const controlSize = size || defaultSize;
-      return renderControl({
-        ...rest,
-        onOpenDialog: this.handleOpenDialog,
-        type,
-        classnames: cx,
-        formItem: model,
-        className: cx(
-          `Form-control`,
-          {
-            'is-inline': !!rest.inline && !mobileUI,
-            'is-error': model && !model.valid,
-            'is-full': size === 'full',
-            [`Form-control--withSize Form-control--size${ucFirst(
-              controlSize
-            )}`]:
-              sizeMutable !== false &&
-              typeof controlSize === 'string' &&
-              !!controlSize &&
-              controlSize !== 'full'
-          },
-          model?.errClassNames,
-          setThemeClassName({
-            ...this.props,
-            name: 'wrapperCustomStyle',
-            id: rest.id,
-            themeCss: rest.wrapperCustomStyle,
-            extra: 'item'
-          }),
-          getItemInputClassName(this.props)
-        )
-      });
-    }
-
-    return null;
-  }
-
   /**
    * 布局扩充点，可以自己扩充表单项的布局方式
    */
@@ -1954,6 +1393,571 @@ export class FormItemWrap extends React.Component<FormItemProps> {
       );
     }
   };
+  lastSearchTerm: any;
+  target: HTMLElement;
+  mounted = false;
+  initedOptionFilled = false;
+  initedApiFilled = false;
+  toDispose: Array<() => void> = [];
+  syncApiAutoFill = debounce(
+    async (term: any, forceLoad?: boolean, skipIfExits = false) => {
+      try {
+        const {autoFill, onBulkChange, formItem, data} = this.props;
+
+        // 参照录入
+        if (
+          !onBulkChange ||
+          !formItem ||
+          !autoFill ||
+          (autoFill && !autoFill?.hasOwnProperty('api'))
+        ) {
+          return;
+        } else if (
+          skipIfExits &&
+          (!autoFill.fillMapping ||
+            Object.keys(autoFill.fillMapping).some(
+              key => typeof getVariable(data, key) !== 'undefined'
+            ))
+        ) {
+          // 只要目标填充值有一个有值，就初始不自动填充
+          return;
+        }
+
+        if (autoFill?.showSuggestion) {
+          this.handleAutoFill('change');
+        } else {
+          // 自动填充
+          const itemName = formItem.name;
+          const ctx = createObject(data, {
+            [itemName || '']: term,
+            __term: term
+          });
+          if (
+            forceLoad ||
+            (isEffectiveApi(autoFill.api, ctx) && this.lastSearchTerm !== term)
+          ) {
+            let result = await formItem.loadAutoUpdateData(
+              autoFill.api,
+              ctx,
+              !!(autoFill.api as BaseApiObject)?.silent
+            );
+
+            this.lastSearchTerm =
+              (result && getVariable(result, itemName)) ?? term;
+
+            // 如果没有返回不应该处理
+            if (!result) {
+              return;
+            }
+
+            if (autoFill?.fillMapping) {
+              result = dataMapping(autoFill.fillMapping, result);
+            }
+
+            if (result) {
+              // 不能把自己给清了吧
+              setVariable(
+                result,
+                itemName,
+                getVariable(result, itemName) || formItem.tmpValue
+              );
+
+              onBulkChange?.(result);
+            }
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    250,
+    {
+      trailing: true,
+      leading: false
+    }
+  );
+
+  constructor(props: FormItemProps) {
+    super(props);
+
+    this.state = {
+      isOpened: false
+    };
+
+    const {formItem: model, formInited, addHook, initAutoFill} = props;
+    if (!model) {
+      return;
+    }
+
+    this.toDispose.push(
+      reaction(
+        () =>
+          `${model.errors.join('')}${model.isFocused}${
+            model.dialogOpen
+          }${JSON.stringify(model.filteredOptions)}`,
+        () => this.forceUpdate()
+      )
+    );
+
+    let onInit = () => {
+      this.initedOptionFilled = true;
+      initAutoFill !== false &&
+        isAlive(model) &&
+        this.syncOptionAutoFill(
+          model.getSelectedOptions(model.tmpValue),
+          initAutoFill === 'fillIfNotSet'
+        );
+      this.initedApiFilled = true;
+      initAutoFill !== false &&
+        isAlive(model) &&
+        this.syncApiAutoFill(
+          model.tmpValue ?? '',
+          false,
+          initAutoFill === 'fillIfNotSet'
+        );
+
+      this.toDispose.push(
+        reaction(
+          () => JSON.stringify(model.tmpValue),
+          () =>
+            this.mounted &&
+            this.initedApiFilled &&
+            this.syncApiAutoFill(model.tmpValue)
+        )
+      );
+
+      this.toDispose.push(
+        reaction(
+          () => JSON.stringify(model.getSelectedOptions(model.tmpValue)),
+          () =>
+            this.mounted &&
+            this.initedOptionFilled &&
+            this.syncOptionAutoFill(model.getSelectedOptions(model.tmpValue))
+        )
+      );
+    };
+    this.toDispose.push(
+      formInited || !addHook
+        ? model.addInitHook(onInit, 999)
+        : addHook(onInit, 'init', 'post')
+    );
+  }
+
+  componentDidMount() {
+    this.mounted = true;
+    this.target = findDOMNode(this) as HTMLElement;
+  }
+
+  componentDidUpdate(prevProps: FormItemProps) {
+    const props = this.props;
+    const {formItem: model} = props;
+
+    if (
+      isEffectiveApi(props.autoFill?.api, props.data) &&
+      isApiOutdated(
+        prevProps.autoFill?.api,
+        props.autoFill?.api,
+        prevProps.data,
+        props.data
+      )
+    ) {
+      this.syncApiAutoFill(model?.tmpValue, true);
+    }
+  }
+
+  componentWillUnmount() {
+    this.syncApiAutoFill.cancel();
+    this.mounted = false;
+    this.toDispose.forEach(fn => fn());
+    this.toDispose = [];
+  }
+
+  @autobind
+  handleFocus(e: any) {
+    const {formItem: model, autoFill, domain} = this.props;
+    model && model.focus();
+    this.props.onFocus && this.props.onFocus(e);
+
+    if (
+      !autoFill ||
+      (autoFill && !autoFill?.hasOwnProperty('showSuggestion'))
+    ) {
+      return;
+    }
+    this.handleAutoFill('focus');
+  }
+
+  @autobind
+  handleBlur(e: any) {
+    const {formItem: model, domain} = this.props;
+    model && model.blur();
+    this.props.onBlur && this.props.onBlur(e);
+  }
+
+  handleAutoFill(type: string) {
+    const {autoFill, onBulkChange, formItem, data} = this.props;
+    const {trigger, mode} = autoFill;
+    if (trigger === type && mode === 'popOver') {
+      // 参照录入 popOver形式
+      this.setState({
+        isOpened: true
+      });
+    } else if (
+      // 参照录入 dialog | drawer
+      trigger === type &&
+      (mode === 'dialog' || mode === 'drawer')
+    ) {
+      formItem?.openDialog(
+        this.buildAutoFillSchema(),
+        data,
+        (confirmed, result) => {
+          if (!result?.selectedItems) {
+            return;
+          }
+
+          this.updateAutoFillData(result.selectedItems);
+        }
+      );
+    }
+  }
+
+  updateAutoFillData(context: any) {
+    const {formStore, autoFill, onBulkChange} = this.props;
+    const {fillMapping, multiple} = autoFill;
+    // form原始数据
+    const data = formStore?.data;
+    const contextData = createObject(
+      {items: !multiple ? [context] : context, ...data},
+      {...context}
+    );
+    let responseData: any = {};
+    responseData = dataMapping(fillMapping, contextData);
+
+    if (!multiple && !fillMapping) {
+      responseData = context;
+    }
+
+    onBulkChange?.(responseData);
+  }
+
+  syncOptionAutoFill(selectedOptions: Array<any>, skipIfExits = false) {
+    const {autoFill, multiple, onBulkChange, data} = this.props;
+    const formItem = this.props.formItem as IFormItemStore;
+    // 参照录入｜自动填充
+    if (autoFill?.hasOwnProperty('api')) {
+      return;
+    }
+
+    if (
+      onBulkChange &&
+      autoFill &&
+      !isEmpty(autoFill) &&
+      formItem.filteredOptions.length
+    ) {
+      const toSync = dataMapping(
+        autoFill,
+        multiple
+          ? {
+              items: selectedOptions.map(item =>
+                createObject(
+                  {
+                    ...data,
+                    ancestors: getTreeAncestors(
+                      formItem.filteredOptions,
+                      item,
+                      true
+                    )
+                  },
+                  item
+                )
+              )
+            }
+          : createObject(
+              {
+                ...data,
+                ancestors: getTreeAncestors(
+                  formItem.filteredOptions,
+                  selectedOptions[0],
+                  true
+                )
+              },
+              selectedOptions[0]
+            )
+      );
+      const tmpData = {...data};
+      const result = {...toSync};
+
+      Object.keys(autoFill).forEach(key => {
+        const keys = keyToPath(key);
+        let value = getVariable(toSync, key);
+
+        if (skipIfExits) {
+          const originValue = getVariable(data, key);
+          if (typeof originValue !== 'undefined') {
+            value = originValue;
+          }
+        }
+
+        setVariable(result, key, value);
+
+        // 如果左边的 key 是一个路径
+        // 这里不希望直接把原始对象都给覆盖没了
+        // 而是保留原始的对象，只修改指定的属性
+        if (keys.length > 1 && isPlainObject(tmpData[keys[0]])) {
+          // 存在情况：依次更新同一子路径的多个key，eg: a.b.c1 和 a.b.c2，所以需要同步更新data
+          setVariable(tmpData, key, value);
+          result[keys[0]] = tmpData[keys[0]];
+        }
+      });
+
+      onBulkChange(result);
+    }
+  }
+
+  buildAutoFillSchema() {
+    const {
+      render,
+      autoFill,
+      classPrefix: ns,
+      classnames: cx,
+      translate: __
+    } = this.props;
+    if (!autoFill || (autoFill && !autoFill?.hasOwnProperty('api'))) {
+      return;
+    }
+    const {
+      api,
+      mode,
+      size,
+      offset,
+      position,
+      multiple,
+      filter,
+      columns,
+      labelField,
+      popOverContainer,
+      popOverClassName,
+      valueField
+    } = autoFill;
+    const form = {
+      type: 'form',
+      // debug: true,
+      title: '',
+      className: 'suggestion-form',
+      body: {
+        type: 'picker',
+        embed: true,
+        joinValues: false,
+        label: false,
+        labelField,
+        valueField: valueField || 'value',
+        multiple,
+        name: 'selectedItems',
+        options: [],
+        required: true,
+        source: api,
+        pickerSchema: {
+          type: 'crud',
+          affixHeader: false,
+          alwaysShowPagination: true,
+          keepItemSelectionOnPageChange: true,
+          headerToolbar: [],
+          footerToolbar: [
+            {
+              type: 'pagination',
+              align: 'left'
+            },
+            {
+              type: 'bulkActions',
+              align: 'right',
+              className: 'ml-2'
+            }
+          ],
+          multiple,
+          filter,
+          columns: columns || []
+        }
+      },
+      actions: [
+        {
+          type: 'button',
+          actionType: 'cancel',
+          label: __('cancel')
+        },
+        {
+          type: 'submit',
+          actionType: 'submit',
+          level: 'primary',
+          label: __('confirm')
+        }
+      ]
+    };
+
+    if (mode === 'popOver') {
+      return (
+        <Overlay
+          container={popOverContainer || this.target}
+          target={() => this.target}
+          placement={position || 'left-bottom-left-top'}
+          show
+        >
+          <PopOver
+            classPrefix={ns}
+            className={cx(`${ns}Autofill-popOver`, popOverClassName)}
+            style={{
+              minWidth: this.target ? this.target.offsetWidth : undefined
+            }}
+            offset={offset}
+            onHide={this.handleClose}
+            overlay
+          >
+            {render('popOver-auto-fill-form', form, {
+              onAction: this.handleAction,
+              onSubmit: this.handleSubmit
+            })}
+          </PopOver>
+        </Overlay>
+      );
+    } else {
+      return {
+        type: mode,
+        className: 'auto-fill-dialog',
+        title: __('FormItem.autoFillSuggest'),
+        size,
+        body: {
+          ...form,
+          wrapWithPanel: false
+        },
+        actions: [
+          {
+            type: 'button',
+            actionType: 'cancel',
+            label: __('cancel')
+          },
+          {
+            type: 'submit',
+            actionType: 'submit',
+            level: 'primary',
+            label: __('confirm')
+          }
+        ]
+      };
+    }
+  }
+
+  // 参照录入popOver提交
+  @autobind
+  handleSubmit(values: any) {
+    const {onBulkChange, autoFill} = this.props;
+    if (!autoFill || (autoFill && !autoFill?.hasOwnProperty('api'))) {
+      return;
+    }
+
+    this.updateAutoFillData(values.selectedItems);
+    this.handleClose();
+  }
+
+  @autobind
+  handleAction(e: React.UIEvent<any>, action: ActionObject, data: object) {
+    if (action.actionType === 'cancel') {
+      this.handleClose();
+    }
+  }
+
+  @autobind
+  handleClose() {
+    this.setState({
+      isOpened: false
+    });
+  }
+
+  @autobind
+  async handleOpenDialog(schema: Schema, data: any) {
+    const {formItem: model} = this.props;
+    if (!model) {
+      return;
+    }
+
+    return new Promise(resolve =>
+      model.openDialog(schema, data, (confirmed: any, value: any) =>
+        resolve(confirmed ? value : false)
+      )
+    );
+  }
+
+  @autobind
+  handleDialogConfirm([values]: Array<any>) {
+    const {formItem: model} = this.props;
+    if (!model) {
+      return;
+    }
+
+    model.closeDialog(true, values);
+  }
+
+  @autobind
+  handleDialogClose(confirmed = false) {
+    const {formItem: model} = this.props;
+    if (!model) {
+      return;
+    }
+    model.closeDialog(confirmed);
+  }
+
+  renderControl(): JSX.Element | null {
+    const {
+      // 这里解构，不可轻易删除，避免被rest传到子组件
+      inputClassName,
+      formItem: model,
+      classnames: cx,
+      children,
+      type,
+      renderControl,
+      formItemConfig,
+      sizeMutable,
+      size,
+      defaultSize,
+      mobileUI,
+      ...rest
+    } = this.props;
+
+    if (renderControl) {
+      const controlSize = size || defaultSize;
+      return renderControl({
+        ...rest,
+        onOpenDialog: this.handleOpenDialog,
+        type,
+        classnames: cx,
+        formItem: model,
+        className: cx(
+          `Form-control`,
+          {
+            'is-inline': !!rest.inline && !mobileUI,
+            'is-error': model && !model.valid,
+            'is-full': size === 'full',
+            [`Form-control--withSize Form-control--size${ucFirst(
+              controlSize
+            )}`]:
+              sizeMutable !== false &&
+              typeof controlSize === 'string' &&
+              !!controlSize &&
+              controlSize !== 'full'
+          },
+          model?.errClassNames,
+          setThemeClassName({
+            ...this.props,
+            name: 'wrapperCustomStyle',
+            id: rest.id,
+            themeCss: rest.wrapperCustomStyle,
+            extra: 'item'
+          }),
+          getItemInputClassName(this.props)
+        )
+      });
+    }
+
+    return null;
+  }
 
   render() {
     const {
@@ -2127,7 +2131,6 @@ export function asFormItem(config: Omit<FormItemConfig, 'component'>) {
       })(observer(Control));
       delete config.storeType;
     }
-
     return wrapControl(
       hoistNonReactStatic(
         class extends FormItemWrap {

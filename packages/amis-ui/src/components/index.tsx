@@ -30,11 +30,13 @@ import Drawer from './Drawer';
 import {default as Tabs, Tab} from './Tabs';
 import Editor from './Editor';
 import Html from './Html';
+
 export * from './icons';
 import * as Icons from './icons';
 import Layout from './Layout';
 import {LazyComponent} from 'amis-core';
 import Modal from './Modal';
+import * as ModalManager from './ModalManager';
 import {Overlay} from 'amis-core';
 import {PopOver} from 'amis-core';
 import Radios from './Radios';
@@ -164,6 +166,7 @@ export {
   Layout,
   LazyComponent,
   Modal,
+  ModalManager,
   Overlay,
   PopOver,
   Radios,

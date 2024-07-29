@@ -3,32 +3,31 @@ import Downshift, {StateChangeOptions} from 'downshift';
 import {matchSorter} from 'match-sorter';
 import debouce from 'lodash/debounce';
 import find from 'lodash/find';
+import type {ListenerAction, Option} from 'amis-core';
 import {
-  OptionsControl,
-  OptionsControlProps,
-  highlight,
-  resolveEventData,
-  CustomStyle,
-  PopOver,
-  Overlay,
-  formatInputThemeCss,
-  setThemeClassName,
   ActionObject,
-  filter,
   autobind,
   createObject,
-  setVariable,
-  ucFirst,
+  CustomStyle,
+  filter,
+  formatInputThemeCss,
+  getVariable,
+  highlight,
   isEffectiveApi,
-  getVariable
+  OptionsControl,
+  OptionsControlProps,
+  Overlay,
+  PopOver,
+  resolveEventData,
+  setThemeClassName,
+  setVariable,
+  ucFirst
 } from 'amis-core';
-import {Icon, SpinnerExtraProps, Input, Spinner, OverflowTpl} from 'amis-ui';
+import {Icon, Input, OverflowTpl, Spinner, SpinnerExtraProps} from 'amis-ui';
 import {ActionSchema} from '../Action';
 import {FormOptionsSchema, SchemaApi} from '../../Schema';
 import {supportStatic} from './StaticHoc';
-
-import type {Option} from 'amis-core';
-import type {ListenerAction} from 'amis-core';
+import {HotKeyEvent} from '../../../../amis-core/src/hotkey/domain';
 
 // declare function matchSorter(items:Array<any>, input:any, options:any): Array<any>;
 
@@ -169,6 +168,7 @@ export default class TextControl extends React.PureComponent<
 
   highlightedIndex?: any;
   unHook: Function;
+
   constructor(props: TextProps) {
     super(props);
 
@@ -263,6 +263,7 @@ export default class TextControl extends React.PureComponent<
     this.input = ref;
   }
 
+  @autobind
   doAction(
     action: ListenerAction,
     data: any,
@@ -397,6 +398,7 @@ export default class TextControl extends React.PureComponent<
 
   async handleFocus(e: any) {
     const {dispatchEvent, onFocus, value} = this.props;
+    onFocus?.(e);
     this.setState({
       isOpen: true,
       isFocused: true
@@ -412,12 +414,11 @@ export default class TextControl extends React.PureComponent<
     if (rendererEvent?.prevented) {
       return;
     }
-
-    onFocus?.(e);
   }
 
   async handleBlur(e: any) {
     const {onBlur, trimContents, value, onChange, dispatchEvent} = this.props;
+    onBlur?.(e);
 
     this.setState(
       {
@@ -446,8 +447,6 @@ export default class TextControl extends React.PureComponent<
     if (rendererEvent?.prevented) {
       return;
     }
-
-    onBlur && onBlur(e);
   }
 
   @autobind
@@ -1065,6 +1064,7 @@ export default class TextControl extends React.PureComponent<
           type={this.state.revealPassword ? 'text' : type}
           onFocus={this.handleFocus}
           onBlur={this.handleBlur}
+          onKeyDown={this.handleKeyDown}
           max={max}
           min={min}
           maxLength={maxLength}
